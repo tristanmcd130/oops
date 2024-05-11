@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+
+from parse import *
+from sys import argv
+
+global_env = Env({
+	"Object": ObjectClass,
+	"Class": ClassClass,
+	"true": Boolean(True),
+	"false": Boolean(False),
+	"List": ListClass,
+})
+
+def run(string, env = global_env):
+	return evaluate(parse(string), env)
+
+def repl(env = global_env):
+	while True:
+		run(input("> "), env).send("print")
+
+match len(argv):
+	case 1:
+		repl()
+	case 2:
+		with open(argv[1]) as file:
+			run(file.read())
+	case _:
+		print(f"Usage: {argv[0]} [file]")
