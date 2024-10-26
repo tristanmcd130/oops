@@ -1,0 +1,320 @@
+#!/usr/bin/env python3
+
+from eval import *
+from tempfile import NamedTemporaryFile
+import unittest
+
+class TestParse(unittest.TestCase):
+	def test_empty(self):
+		self.assertEqual(parse(""), ast.Block([]))
+	def test_comment(self):
+		self.assertEqual(parse("# a = 5\n# do end"), ast.Block([]))
+	def test_assign(self):
+		self.assertEqual(parse("a = 5"), ast.Assign("a", ast.Int(5)))
+		self.assertRaises(SyntaxError, parse, "a = b = null")
+		self.assertRaises(SyntaxError, parse, "a =")
+	def test_op_assign(self):
+		self.assertEqual(parse("a += 5"), ast.OpAssign("a", "+", ast.Int(5)))
+		self.assertRaises(SyntaxError, parse, "a and= 5")
+	def test_dot_assign(self):
+		self.assertEqual(parse("a.b = 5"), ast.DotAssign(ast.Var("a"), "b", "", ast.Int(5)))
+		self.assertEqual(parse("a[5].b *= 5"), ast.DotAssign(ast.Op("[]", [ast.Var("a"), ast.Int(5)]), "b", "*", ast.Int(5)))
+	def test_index_assign(self):
+		self.assertEqual(parse("a[4] = 5"), ast.IndexAssign(ast.Var("a"), ast.Int(4), "", ast.Int(5)))
+		self.assertEqual(parse("a.b[b] += 5"), ast.IndexAssign(ast.Dot(ast.Var("a"), "b"), ast.Var("b"), "+", ast.Int(5)))
+	def test_nonlocal(self):
+		self.assertEqual(parse("nonlocal a += 5"), ast.Nonlocal("a", "+", ast.Int(5)))
+	def test_super(self):
+		self.assertEqual(parse("super.a(b)"), ast.Super("a", [ast.Var("b")]))
+	def test_call(self):
+		self.assertEqual(parse("a()"), ast.Op("()", [ast.Var("a")]))
+		self.assertEqual(parse("a(1, 2)"), ast.Op("()", [ast.Var("a"), ast.Int(1), ast.Int(2)]))
+		self.assertEqual(parse("a()()"), ast.Op("()", [ast.Op("()", [ast.Var("a")])]))
+		self.assertEqual(parse("a(...[1, 2, 3])"), ast.Op("()", [ast.Var("a"), ast.SplatArg(ast.List([ast.Int(1), ast.Int(2), ast.Int(3)]))]))
+	def test_break(self):
+		self.assertEqual(parse("break"), ast.Break())
+	def test_continue(self):
+		self.assertEqual(parse("continue"), ast.Continue())
+	def test_do(self):
+		self.assertEqual(parse("do a = b c() end"), ast.Do(ast.Block([ast.Assign("a", ast.Var("b")), ast.Op("()", [ast.Var("c")])])))
+		self.assertRaises(SyntaxError, parse, "do 1 2 end")
+	def test_while(self):
+		self.assertEqual(parse("while 1 do c() end"), ast.While(ast.Int(1), ast.Op("()", [ast.Var("c")])))
+	def test_if(self):
+		self.assertEqual(parse("if 1 then c() end"), ast.If([(ast.Int(1), ast.Op("()", [ast.Var("c")])), (ast.Bool(True), ast.Block([]))]))
+		self.assertEqual(parse("if 1 then c() else d() end"), ast.If([(ast.Int(1), ast.Op("()", [ast.Var("c")])), (ast.Bool(True), ast.Op("()", [ast.Var("d")]))]))
+		self.assertEqual(parse("if 1 then c() else if 2 then d() end"), ast.If([(ast.Int(1), ast.Op("()", [ast.Var("c")])), (ast.Int(2), ast.Op("()", [ast.Var("d")])), (ast.Bool(True), ast.Block([]))]))
+		self.assertEqual(parse("if 1 then c() else if 2 then d() else e() end"), ast.If([(ast.Int(1), ast.Op("()", [ast.Var("c")])), (ast.Int(2), ast.Op("()", [ast.Var("d")])), (ast.Bool(True), ast.Op("()", [ast.Var("e")]))]))
+	def test_for(self):
+		self.assertEqual(parse("for i in [] do c() d() end"), ast.For("i", ast.List([]), ast.Block([ast.Op("()", [ast.Var("c")]), ast.Op("()", [ast.Var("d")])])))
+	def test_fun(self):
+		self.assertEqual(parse("fun a() end"), ast.Fun("a", [], ast.Block([])))
+		self.assertEqual(parse("fun a(b, c) return b + c end"), ast.Fun("a", ["b", "c"], ast.Return(ast.Op("+", [ast.Var("b"), ast.Var("c")]))))
+		self.assertEqual(parse("fun ()(a) end"), ast.Fun("()", ["a"], ast.Block([])))
+		self.assertEqual(parse("fun []() end"), ast.Fun("[]", [], ast.Block([])))
+		self.assertRaises(SyntaxError, parse, "fun <===>() end")
+		self.assertEqual(parse("fun a(b, c = 5, d = 9, ...e) end"), ast.Fun("a", ["b", ast.Assign("c", ast.Int(5)), ast.Assign("d", ast.Int(9)), "...e"], ast.Block([])))
+		self.assertEqual(parse("fun a(d = 9, ...e) end"), ast.Fun("a", [ast.Assign("d", ast.Int(9)), "...e"], ast.Block([])))
+		self.assertEqual(parse("fun a(d = 9) end"), ast.Fun("a", [ast.Assign("d", ast.Int(9))], ast.Block([])))
+		self.assertEqual(parse("fun a(...e) end"), ast.Fun("a", ["...e"], ast.Block([])))
+	def test_class(self):
+		self.assertEqual(parse("class A end"), ast.Class("A", "", [], [], []))
+		self.assertEqual(parse("class A extends B end"), ast.Class("A", "B", [], [], []))
+		self.assertEqual(parse("class A extends B a = 5 static fun d() end fun c() end end"), ast.Class("A", "B", [ast.Fun("c", [], ast.Block([]))], [ast.Fun("d", [], ast.Block([]))], [ast.Assign("a", ast.Int(5))]))
+	def test_return(self):
+		self.assertEqual(parse("return"), ast.Return(ast.Null()))
+		self.assertEqual(parse("return 5"), ast.Return(ast.Int(5)))
+	def test_import(self):
+		self.assertEqual(parse('import ""'), ast.Import(""))
+		self.assertEqual(parse('import "\\n\\u0065"'), ast.Import("\ne"))
+	def test_try(self):
+		self.assertEqual(parse("try catch e end"), ast.Try(ast.Block([]), "e", ast.Block([])))
+		self.assertRaises(SyntaxError, parse, "try catch end")
+		self.assertEqual(parse("try a = 1/0 catch e print(1) end"), ast.Try(ast.Assign("a", ast.Op("/", [ast.Int(1), ast.Int(0)])), "e", ast.Op("()", [ast.Var("print"), ast.Int(1)])))
+	def test_throw(self):
+		self.assertEqual(parse("throw 1"), ast.Throw(ast.Int(1)))
+		self.assertRaises(SyntaxError, parse, "throw")
+	def test_null(self):
+		self.assertEqual(parse("null", "repl_exp"), ast.Null())
+	def test_bool(self):
+		self.assertEqual(parse("true", "repl_exp"), ast.Bool(True))
+		self.assertEqual(parse("false", "repl_exp"), ast.Bool(False))
+	def test_int(self):
+		self.assertEqual(parse("4", "repl_exp"), ast.Int(4))
+		self.assertEqual(parse("-4", "repl_exp"), ast.Int(-4))
+	def test_float(self):
+		self.assertEqual(parse("-5.0", "repl_exp"), ast.Float(-5.0))
+		self.assertEqual(parse("-5.3e44", "repl_exp"), ast.Float(-5.3e44))
+		self.assertEqual(parse("-.4e44", "repl_exp"), ast.Float(-.4e44))
+		self.assertEqual(parse(".4", "repl_exp"), ast.Float(.4))
+	def test_string(self):
+		self.assertEqual(parse('"a"', "repl_exp"), ast.String("a"))
+		self.assertEqual(parse('"\\"\\u0065\\t\\""', "repl_exp"), ast.String("\"e\t\""))
+	def test_list(self):
+		self.assertEqual(parse("[]", "repl_exp"), ast.List([]))
+		self.assertEqual(parse('[[], 1, "p", true, {}]', "repl_exp"), ast.List([ast.List([]), ast.Int(1), ast.String("p"), ast.Bool(True), ast.Dict([])]))
+	def test_dict(self):
+		self.assertEqual(parse("{}", "repl_exp"), ast.Dict([]))
+		self.assertEqual(parse("{1: 2, 3: 4}", "repl_exp"), ast.Dict([(ast.Int(1), ast.Int(2)), (ast.Int(3), ast.Int(4))]))
+	def test_lambda(self):
+		self.assertEqual(parse("fun() end", "repl_exp"), ast.Lambda([], ast.Block([])))
+		self.assertEqual(parse("fun(b, c) return b + c end", "repl_exp"), ast.Lambda(["b", "c"], ast.Return(ast.Op("+", [ast.Var("b"), ast.Var("c")]))))
+	def test_parens(self):
+		self.assertEqual(parse("((((((((((((((((((((((((((5))))))))))))))))))))))))))", "repl_exp"), ast.Int(5))
+		self.assertEqual(parse("(((((((((((2 * (((((((((((((((5))))))))))))))))))))))))))", "repl_exp"), ast.Op("*", [ast.Int(2), ast.Int(5)]))
+		self.assertRaises(SyntaxError, parse, "()", "repl_exp")
+	def test_var(self):
+		self.assertEqual(parse("a", "repl_exp"), ast.Var("a"))
+		self.assertRaises(SyntaxError, parse, "if", "repl_exp")
+		self.assertRaises(SyntaxError, parse, "while", "repl_exp")
+		self.assertRaises(SyntaxError, parse, "class", "repl_exp")
+		self.assertRaises(SyntaxError, parse, "end", "repl_exp")
+	def test_dot(self):
+		self.assertEqual(parse("a.b", "repl_exp"), ast.Dot(ast.Var("a"), "b"))
+		self.assertRaises(SyntaxError, parse, "a.5", "repl_exp")
+		self.assertRaises(SyntaxError, parse, "a.if", "repl_exp")
+		self.assertEqual(parse("a.b.c", "repl_exp"), ast.Dot(ast.Dot(ast.Var("a"), "b"), "c"))
+	def test_index(self):
+		self.assertEqual(parse("a[b]", "repl_exp"), ast.Op("[]", [ast.Var("a"), ast.Var("b")]))
+		self.assertEqual(parse("a[5][7]", "repl_exp"), ast.Op("[]", [ast.Op("[]", [ast.Var("a"), ast.Int(5)]), ast.Int(7)]))
+	def test_unary(self):
+		self.assertEqual(parse("-null", "repl_exp"), ast.Op("u-", [ast.Null()]))
+		self.assertEqual(parse("--5", "repl_exp"), ast.Op("u-", [ast.Int(-5)]))
+		self.assertEqual(parse("not -5", "repl_exp"), ast.Op("unot", [ast.Int(-5)]))
+	def test_factor(self):
+		self.assertEqual(parse("4 * 5", "repl_exp"), ast.Op("*", [ast.Int(4), ast.Int(5)]))
+		self.assertEqual(parse("4 / 5", "repl_exp"), ast.Op("/", [ast.Int(4), ast.Int(5)]))
+		self.assertEqual(parse("4 % 5", "repl_exp"), ast.Op("%", [ast.Int(4), ast.Int(5)]))
+		self.assertEqual(parse("4 % 5 + 3", "repl_exp"), ast.Op("+", [ast.Op("%", [ast.Int(4), ast.Int(5)]), ast.Int(3)]))
+	def test_term(self):
+		self.assertEqual(parse("4 + 5", "repl_exp"), ast.Op("+", [ast.Int(4), ast.Int(5)]))
+		self.assertEqual(parse("3 < 4 - -5", "repl_exp"), ast.Op("<", [ast.Int(3), ast.Op("-", [ast.Int(4), ast.Int(-5)])]))
+	def test_compare(self):
+		self.assertEqual(parse("4 < 5", "repl_exp"), ast.Op("<", [ast.Int(4), ast.Int(5)]))
+		self.assertEqual(parse("4 <= 5", "repl_exp"), ast.Op("<=", [ast.Int(4), ast.Int(5)]))
+		self.assertEqual(parse("4 == 5", "repl_exp"), ast.Op("==", [ast.Int(4), ast.Int(5)]))
+		self.assertEqual(parse("4 != 5", "repl_exp"), ast.Op("!=", [ast.Int(4), ast.Int(5)]))
+		self.assertEqual(parse("4 > 5", "repl_exp"), ast.Op(">", [ast.Int(4), ast.Int(5)]))
+		self.assertEqual(parse("4 >= 5 and true", "repl_exp"), ast.Op("and", [ast.Op(">=", [ast.Int(4), ast.Int(5)]), ast.Bool(True)]))
+	def test_and(self):
+		self.assertEqual(parse("true and false", "repl_exp"), ast.Op("and", [ast.Bool(True), ast.Bool(False)]))
+	def test_or(self):
+		self.assertEqual(parse("true or false", "repl_exp"), ast.Op("or", [ast.Bool(True), ast.Bool(False)]))
+	def test_ternary(self):
+		self.assertEqual(parse("true and false ? 4 : 5", "repl_exp"), ast.Op("?:", [ast.Op("and", [ast.Bool(True), ast.Bool(False)]), ast.Int(4), ast.Int(5)]))
+
+class TestEval(unittest.TestCase):
+	def test_assign(self):
+		env = Env({})
+		eval(ast.Assign("a", ast.Int(5)), env)
+		self.assertEqual(env["a"], 5)
+		self.assertRaises(NameError, eval, ast.Assign("a", ast.Var("b")), Env({}))
+		eval(ast.Assign("a", ast.Int(6)), env)
+		self.assertEqual(env["a"], 6)
+	def test_op_assign(self):
+		env = Env({"a": 1})
+		eval(ast.OpAssign("a", "-", ast.Int(5)), env)
+		self.assertEqual(env["a"], -4)
+		env2 = Env({}, env)
+		eval(ast.OpAssign("a", "-", ast.Int(5)), env2)
+		self.assertRaises(KeyError, lambda: env2.bindings["a"])
+		self.assertEqual(env["a"], -9)
+	def test_dot_assign(self):
+		env = Env({"a": Object(ObjectClass, {})})
+		self.assertRaises(KeyError, eval, ast.DotAssign(ast.Var("a"), "b", "+", ast.Int(5)), env)
+		eval(ast.DotAssign(ast.Var("a"), "b", "", ast.Int(5)), env)
+		self.assertEqual(env["a"]["b"], 5)
+		eval(ast.DotAssign(ast.Var("a"), "b", "+", ast.Int(5)), env)
+		self.assertEqual(env["a"]["b"], 10)
+		env = Env({"a": [Object(ObjectClass, {"b": 1})]})
+		eval(ast.DotAssign(ast.Op("[]", [ast.Var("a"), ast.Int(0)]), "b", "-", ast.Int(10)), env)
+		self.assertEqual(env["a"][0]["b"], -9)
+	def test_index_assign(self):
+		env = Env({"a": {1: 2, 3: 4, 5: Object(ObjectClass, {"b": 8})}})
+		self.assertEqual(env["a"][1], 2)
+		self.assertRaises(KeyError, eval, ast.IndexAssign(ast.Var("a"), ast.Int(0), "+", ast.Int(5)), env)
+		eval(ast.IndexAssign(ast.Var("a"), ast.Int(0), "", ast.Int(5)), env)
+		self.assertEqual(env["a"][0], 5)
+		eval(ast.IndexAssign(ast.Var("a"), ast.Int(0), "*", ast.Int(5)), env)
+		self.assertEqual(env["a"][0], 25)
+		env = Env({"a": Object(ObjectClass, {"b": [1, 2, 3, 4]})})
+		eval(ast.IndexAssign(ast.Dot(ast.Var("a"), "b"), ast.Int(0), "+", ast.Int(10)), env)
+		self.assertEqual(env["a"]["b"], [11, 2, 3, 4])
+	def test_nonlocal(self):
+		env = Env({"a": 1})
+		env2 = Env({"a": 7}, env)
+		self.assertRaises(NameError, eval, ast.Nonlocal("a", "", ast.Int(6)), env)
+		eval(ast.Nonlocal("a", "", ast.Int(6)), env2)
+		self.assertEqual(env["a"], 6)
+		self.assertEqual(env2["a"], 7)
+		eval(ast.Nonlocal("a", "-", ast.Int(8)), env2)
+		self.assertEqual(env["a"], -2)
+		self.assertEqual(env2["a"], 7)
+	def test_super(self):
+		AClass = Class("A", ObjectClass, Class("AMetaclass", ObjectClass.class_, ClassClass, {}, {}), {
+			"method": Function("A.method", [], ast.Return(ast.String("A method")), Env({}))
+		}, {})
+		BClass = Class("B", AClass, Class("BMetaclass", AClass.class_, ClassClass, {}, {}), {
+			"method": Function("B.method", [], ast.Return(ast.String("B method")), Env({})),
+			"test": Function("B.test", [], ast.Return(ast.Super("method", [])), Env({}))
+		}, {})
+		CClass = Class("C", BClass, Class("CMetaclass", BClass.class_, ClassClass, {}, {}), {}, {})
+		self.assertEqual(eval(ast.Op("()", [ast.Dot(ast.Op("()", [ast.Var("C")]), "test")]), Env({
+			"A": AClass,
+			"B": BClass,
+			"C": CClass,
+		})), "A method")
+	def test_op(self):
+		self.assertEqual(eval(ast.Op("[]", [ast.List([ast.Int(1), ast.Int(2), ast.Int(3), ast.Int(4)]), ast.Int(2)]), Env({})), 3)
+		env = Env({"a": [1, 2, 3]})
+		eval(ast.Op("[]=", [ast.Var("a"), ast.Int(2), ast.Int(6)]), env)
+		self.assertEqual(env["a"], [1, 2, 6])
+		self.assertEqual(eval(ast.Op("()", [ast.Var("hello")]), Env({"hello": lambda: "Hello, world!"})), "Hello, world!")
+		self.assertEqual(eval(ast.Op("u-", [ast.Int(5)]), Env({})), -5)
+		self.assertEqual(eval(ast.Op("unot", [ast.Int(5)]), Env({})), False)
+		self.assertEqual(eval(ast.Op("unot", [ast.Int(0)]), Env({})), True)
+		self.assertEqual(eval(ast.Op("*", [ast.Int(-1), ast.Int(-1)]), Env({})), 1)
+		self.assertEqual(eval(ast.Op("/", [ast.Int(-1), ast.Int(6)]), Env({})), -1.0/6.0)
+		self.assertEqual(eval(ast.Op("%", [ast.Int(5), ast.Int(3)]), Env({})), 2)
+		self.assertEqual(eval(ast.Op("+", [ast.Int(5), ast.Int(3)]), Env({})), 8)
+		self.assertEqual(eval(ast.Op("+", [ast.String("hello "), ast.String("world")]), Env({})), "hello world")
+		self.assertEqual(eval(ast.Op("+", [ast.List([ast.Int(1), ast.Int(2)]), ast.List([ast.Int(3), ast.Int(4)])]), Env({})), [1, 2, 3, 4])
+		self.assertEqual(eval(ast.Op("-", [ast.Int(5), ast.Int(3)]), Env({})), 2)
+		self.assertEqual(eval(ast.Op("<", [ast.Int(5), ast.Int(3)]), Env({})), False)
+		self.assertEqual(eval(ast.Op("<=", [ast.Int(5), ast.Int(5)]), Env({})), True)
+		self.assertEqual(eval(ast.Op("==", [ast.Int(5), ast.Int(5)]), Env({})), True)
+		self.assertEqual(eval(ast.Op(">", [ast.Int(5), ast.Int(5)]), Env({})), False)
+		self.assertEqual(eval(ast.Op(">=", [ast.Int(5), ast.Int(5)]), Env({})), True)
+		self.assertEqual(eval(ast.Op("and", [ast.Int(5), ast.Int(5)]), Env({})), True)
+		self.assertEqual(eval(ast.Op("and", [ast.Int(5), ast.Int(0)]), Env({})), False)
+		self.assertEqual(eval(ast.Op("or", [ast.Int(5), ast.Int(0)]), Env({})), True)
+		self.assertEqual(eval(ast.Op("or", [ast.Int(0), ast.Int(0)]), Env({})), False)
+		self.assertEqual(eval(ast.Op("?:", [ast.Bool(True), ast.Int(4), ast.Int(5)]), Env({})), 4)
+		self.assertEqual(eval(ast.Op("?:", [ast.Bool(False), ast.Int(4), ast.Int(5)]), Env({})), 5)
+	def test_to_string(self):
+		self.assertEqual(eval(ast.Op("to_string", [ast.Null()]), Env({})), "null")
+		self.assertEqual(eval(ast.Op("to_string", [ast.Bool(True)]), Env({})), "true")
+		self.assertEqual(eval(ast.Op("to_string", [ast.Bool(False)]), Env({})), "false")
+		self.assertEqual(eval(ast.Op("to_string", [ast.Int(4)]), Env({})), "4")
+		self.assertEqual(eval(ast.Op("to_string", [ast.Float(-4.5)]), Env({})), "-4.5")
+		self.assertEqual(eval(ast.Op("to_string", [ast.String("\t\n")]), Env({})), "\t\n")
+		self.assertEqual(eval(ast.Op("to_string", [ast.List([ast.Null(), ast.Int(4)])]), Env({})), "[null, 4]")
+		self.assertEqual(eval(ast.Op("to_string", [ast.Dict([(ast.Null(), ast.Int(4)), (ast.Float(5.6), ast.Bool(True))])]), Env({})), "{null: 4, 5.6: true}")
+		self.assertEqual(eval(ast.Op("to_string", [ast.Var("f")]), Env({"f": Function("f", [], ast.Block([]), Env({}))})), "<function f>")
+		self.assertEqual(eval(ast.Op("to_string", [ast.Lambda([], ast.Block([]))]), Env({})), "<lambda>")
+		self.assertEqual(eval(ast.Op("to_string", [ast.Var("C")]), Env({"C": Class("C", ObjectClass, Class("CMetaclass", ObjectClass.class_, ClassClass, {}, {}), {}, {})})), "<class C>")
+		self.assertEqual(eval(ast.Op("to_string", [ast.Op("()", [ast.Var("C")])]), Env({"C": Class("C", ObjectClass, Class("CMetaclass", ObjectClass.class_, ClassClass, {}, {}), {}, {})})), "<C object>")
+	def test_break(self):
+		self.assertEqual(eval(ast.Op("()", [ast.Var("f")]), Env({"f": Function("f", [], ast.Block([ast.While(ast.Int(1), ast.Block([ast.Break(), ast.Return(ast.Int(-1))])), ast.Return(ast.Int(1))]), Env({}))})), 1)
+		self.assertEqual(eval(ast.Op("()", [ast.Var("f")]), Env({"f": Function("f", [], ast.Block([ast.For("x", ast.List([ast.Int(6)]), ast.Block([ast.Break(), ast.Return(ast.Int(-1))])), ast.Return(ast.Int(1))]), Env({}))})), 1)
+	def test_continue(self):
+		env = Env({})
+		eval(ast.Block([ast.Assign("a", ast.Int(0)), ast.For("x", ast.List([ast.Int(1), ast.Int(2), ast.Int(3), ast.Int(4), ast.Int(5)]), ast.Block([ast.Continue(), ast.Assign("a", ast.Op("+", [ast.Var("a"), ast.Var("x")]))]))]), env)
+		self.assertEqual(env["a"], 0)
+	def test_do(self):
+		self.assertRaises(NameError, eval, ast.Block([ast.Do(ast.Block([ast.Assign("a", ast.Int(0))])), ast.Op("()", [ast.Var("print"), ast.Var("a")])]), Env({}))
+	def test_while(self):
+		env = Env({})
+		eval(ast.Block([ast.Assign("a", ast.Int(0)), ast.While(ast.Op("<", [ast.Var("a"), ast.Int(10)]), ast.Assign("a", ast.Op("+", [ast.Var("a"), ast.Int(1)])))]), env)
+		self.assertEqual(env["a"], 10)
+	def test_for(self):
+		env = Env({})
+		eval(ast.Block([ast.Assign("a", ast.Int(0)), ast.For("x", ast.List([ast.Int(1), ast.Int(2), ast.Int(3), ast.Int(4), ast.Int(5)]), ast.Assign("a", ast.Op("+", [ast.Var("a"), ast.Var("x")])))]), env)
+		self.assertEqual(env["a"], 15)
+	def test_fun(self):
+		env = Env({})
+		eval(ast.Fun("add", ["x", "y"], ast.Return(ast.Op("+", [ast.Var("x"), ast.Var("y")]))), env)
+		self.assertEqual(eval(ast.Op("()", [ast.Var("add"), ast.Float(5.3), ast.Float(-4.3)]), env), 1)
+		self.assertRaises(TypeError, eval, ast.Op("()", [ast.Var("add")]), env)
+		eval(ast.Fun("add2", [ast.Assign("x", ast.Int(0)), ast.Assign("y", ast.Int(0))], ast.Return(ast.Op("+", [ast.Var("x"), ast.Var("y")]))), env)
+		self.assertEqual(eval(ast.Op("()", [ast.Var("add2")]), env), 0)
+		self.assertEqual(eval(ast.Op("()", [ast.Var("add2"), ast.Float(5.3)]), env), 5.3)
+		self.assertEqual(eval(ast.Op("()", [ast.Var("add2"), ast.Float(5.3), ast.Float(-4.3)]), env), 1)
+		eval(ast.Fun("add3", ["...x"], ast.Block([ast.Assign("total", ast.Int(0)), ast.For("i", ast.Var("x"), ast.OpAssign("total", "+", ast.Var("i"))), ast.Return(ast.Var("total"))])), env)
+		self.assertEqual(eval(ast.Op("()", [ast.Var("add3")]), env), 0)
+		self.assertEqual(eval(ast.Op("()", [ast.Var("add3")] + [ast.Int(x) for x in range(1, 101)]), env), 5050)
+	def test_class(self):
+		env = Env({})
+		eval(ast.Class("C", "", [], [], []), env)
+		result = eval(ast.Op("()", [ast.Var("C")]), env)
+		self.assertEqual(result.class_, env["C"])
+	def test_return(self):
+		env = Env({})
+		eval(ast.Fun("f", [], ast.Block([ast.Return(ast.Int(5)), ast.Return(ast.Int(50))])), env)
+		self.assertEqual(eval(ast.Op("()", [ast.Var("f")]), env), 5)
+	def test_import(self):
+		env = Env({})
+		with NamedTemporaryFile(delete_on_close = False) as tmp:
+			tmp.write(b"a = 5\nb = 9")
+			tmp.close()
+			eval(ast.Import(tmp.name), env)
+		self.assertEqual(env.bindings, {"a": 5, "b": 9})
+	def test_try(self):
+		env = Env({})
+		eval(ast.Try(ast.Assign("a", ast.Op("/", [ast.Int(1), ast.Int(0)])), "e", ast.Assign("a", ast.Int(1))), env)
+		self.assertEqual(env["a"], 1)
+	def test_throw(self):
+		self.assertEqual(parse("throw 1"), ast.Throw(ast.Int(1)))
+		self.assertRaises(SyntaxError, parse, "throw")
+	def test_null(self):
+		self.assertEqual(eval(ast.Null(), Env({})), None)
+	def test_bool(self):
+		self.assertEqual(eval(ast.Bool(True), Env({})), True)
+		self.assertEqual(eval(ast.Bool(False), Env({})), False)
+	def test_list(self):
+		self.assertEqual(eval(ast.List([]), Env({})), [])
+		self.assertEqual(eval(ast.List([ast.Int(3), ast.Float(4.5), ast.String("a")]), Env({})), [3, 4.5, "a"])
+	def test_dict(self):
+		self.assertEqual(eval(ast.Dict([]), Env({})), {})
+		self.assertEqual(eval(ast.Dict([(ast.Int(3), ast.Float(4.5)), (ast.Int(3), ast.String("a"))]), Env({})), {3: "a"})
+	def test_lambda(self):
+		self.assertEqual(eval(ast.Op("()", [ast.Lambda(["x"], ast.Return(ast.Op("+", [ast.Var("x"), ast.Int(1)]))), ast.Int(4)]), Env({})), 5)
+	def test_var(self):
+		self.assertEqual(eval(ast.Var("a"), Env({"a": 2})), 2)
+	def test_dot(self):
+		self.assertRaises(Exception, eval, ast.Dot(ast.Dict([(ast.String("a"), ast.Int(5)), (ast.String("b"), ast.Int(65))]), "a"))
+		def C_init(self, x):
+			self.fields["x"] = x + 3
+		self.assertEqual(eval(ast.Dot(ast.Op("()", [ast.Var("C"), ast.Int(4)]), "x"), Env({"C": Class("C", ObjectClass, Class("CMetaclass", ObjectClass.class_, ClassClass, {}, {}), {"init": C_init}, {})})), 7)
+
+unittest.main()
