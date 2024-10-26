@@ -86,6 +86,12 @@ class For(Stmt):
 	body: Stmt
 
 @dataclass
+class Switch(Stmt):
+	exp: Exp
+	cases: list[tuple[list[Exp], Stmt]]
+	default: Stmt
+
+@dataclass
 class Fun(Stmt):
 	name: str
 	params: list[str | Assign]

@@ -46,6 +46,12 @@ class OopsTransformer(OopsVisitor):
 		return self.visit(ctx.block())
 	def visitFor_(self, ctx: OopsParser.For_Context):
 		return ast.For(ctx.NAME().getText(), self.visit(ctx.exp()), self.visit(ctx.block()))
+	def visitSwitch(self, ctx: OopsParser.SwitchContext):
+		return ast.Switch(self.visit(ctx.exp()), [self.visit(case) for case in ctx.case()], self.visit(ctx.default()) if ctx.default() else ast.Block([]))
+	def visitCase(self, ctx: OopsParser.CaseContext):
+		return ([self.visit(exp) for exp in ctx.exp()], self.visit(ctx.block()))
+	def visitDefault(self, ctx: OopsParser.DefaultContext):
+		return self.visit(ctx.block())
 	def visitFun(self, ctx: OopsParser.FunContext):
 		return ast.Fun(ctx.fun_name().getText(), self.visit(ctx.params()), self.visit(ctx.block()))
 	def visitParams(self, ctx: OopsParser.ParamsContext):

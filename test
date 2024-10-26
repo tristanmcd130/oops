@@ -47,6 +47,10 @@ class TestParse(unittest.TestCase):
 		self.assertEqual(parse("if 1 then c() else if 2 then d() else e() end"), ast.If([(ast.Int(1), ast.Op("()", [ast.Var("c")])), (ast.Int(2), ast.Op("()", [ast.Var("d")])), (ast.Bool(True), ast.Op("()", [ast.Var("e")]))]))
 	def test_for(self):
 		self.assertEqual(parse("for i in [] do c() d() end"), ast.For("i", ast.List([]), ast.Block([ast.Op("()", [ast.Var("c")]), ast.Op("()", [ast.Var("d")])])))
+	def test_switch(self):
+		self.assertEqual(parse("switch 1 end"), ast.Switch(ast.Int(1), [], ast.Block([])))
+		self.assertEqual(parse("switch 1 case 2, 3 then c() end"), ast.Switch(ast.Int(1), [([ast.Int(2), ast.Int(3)], ast.Op("()", [ast.Var("c")]))], ast.Block([])))
+		self.assertEqual(parse("switch 1 case 2, 3 then c() default d() end"), ast.Switch(ast.Int(1), [([ast.Int(2), ast.Int(3)], ast.Op("()", [ast.Var("c")]))], ast.Op("()", [ast.Var("d")])))
 	def test_fun(self):
 		self.assertEqual(parse("fun a() end"), ast.Fun("a", [], ast.Block([])))
 		self.assertEqual(parse("fun a(b, c) return b + c end"), ast.Fun("a", ["b", "c"], ast.Return(ast.Op("+", [ast.Var("b"), ast.Var("c")]))))
@@ -261,6 +265,16 @@ class TestEval(unittest.TestCase):
 		env = Env({})
 		eval(ast.Block([ast.Assign("a", ast.Int(0)), ast.For("x", ast.List([ast.Int(1), ast.Int(2), ast.Int(3), ast.Int(4), ast.Int(5)]), ast.Assign("a", ast.Op("+", [ast.Var("a"), ast.Var("x")])))]), env)
 		self.assertEqual(env["a"], 15)
+	def test_switch(self):
+		env = Env({})
+		eval(ast.Switch(ast.Int(1), [([ast.Int(2), ast.Int(3)], ast.Assign("a", ast.Int(1))), ([ast.Int(4)], ast.Assign("a", ast.Int(2)))], ast.Assign("a", ast.Int(3))), env)
+		self.assertEqual(env["a"], 3)
+		eval(ast.Switch(ast.Int(2), [([ast.Int(2), ast.Int(3)], ast.Assign("a", ast.Int(1))), ([ast.Int(4)], ast.Assign("a", ast.Int(2)))], ast.Assign("a", ast.Int(3))), env)
+		self.assertEqual(env["a"], 1)
+		eval(ast.Switch(ast.Int(3), [([ast.Int(2), ast.Int(3)], ast.Assign("a", ast.Int(1))), ([ast.Int(4)], ast.Assign("a", ast.Int(2)))], ast.Assign("a", ast.Int(3))), env)
+		self.assertEqual(env["a"], 1)
+		eval(ast.Switch(ast.Int(4), [([ast.Int(2), ast.Int(3)], ast.Assign("a", ast.Int(1))), ([ast.Int(4)], ast.Assign("a", ast.Int(2)))], ast.Assign("a", ast.Int(3))), env)
+		self.assertEqual(env["a"], 2)
 	def test_fun(self):
 		env = Env({})
 		eval(ast.Fun("add", ["x", "y"], ast.Return(ast.Op("+", [ast.Var("x"), ast.Var("y")]))), env)

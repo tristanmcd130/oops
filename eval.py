@@ -303,6 +303,13 @@ def eval(tree, env):
 				except ContinueException:
 					pass
 				iterator["next"]()
+		case ast.Switch(exp, cases, default):
+			exp = eval(exp, env)
+			for (values, body) in cases:
+				if any([do_op("==", exp, eval(value, env)) for value in values]):
+					eval(body, env)
+					return
+			eval(default, env)
 		case ast.Fun(name, params, body):
 			env[name] = Function(name, [(param.name, eval(param.value, env)) if isinstance(param, ast.Assign) else param for param in params], body, env)
 		case ast.Class(name, superclass, methods, static_methods, static_fields):

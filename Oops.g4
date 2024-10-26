@@ -16,6 +16,7 @@ stmt
 	| while_		# while_stmt
 	| if_			# if_stmt
 	| for_			# for_stmt
+	| switch		# switch_stmt
 	| fun			# fun_stmt
 	| class_		# class_stmt
 	| return_		# return_stmt
@@ -45,6 +46,9 @@ if_: 'if' exp 'then' block else_if* else_? 'end';
 else_if: 'else' 'if' exp 'then' block;
 else_: 'else' block;
 for_: 'for' NAME 'in' exp 'do' block 'end';
+switch: 'switch' exp case* default? 'end';
+case: 'case' exp (',' exp)* 'then' block;
+default: 'default' block;
 fun: 'fun' fun_name params block 'end';
 fun_name: NAME | '[' ']' | '[' ']' '=' | '(' ')' | 'unot' | 'u-' | '*' | '/' | '%' | '+' | '-' | '<=' | '==' | '!=' | '>' | '>=' | 'and' | 'or';
 params
