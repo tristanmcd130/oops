@@ -53,7 +53,7 @@ class TestParse(unittest.TestCase):
 		self.assertEqual(parse("switch 1 case 2, 3 then c() default d() end"), ast.Switch(ast.Int(1), [([ast.Int(2), ast.Int(3)], ast.Op("()", [ast.Var("c")]))], ast.Op("()", [ast.Var("d")])))
 	def test_fun(self):
 		self.assertEqual(parse("fun a() end"), ast.Fun("a", [], ast.Block([])))
-		self.assertEqual(parse("fun a(b, c) return b + c end"), ast.Fun("a", ["b", "c"], ast.Return(ast.Op("+", [ast.Var("b"), ast.Var("c")]))))
+		self.assertEqual(parse("fun and(b, c) return b + c end"), ast.Fun("and", ["b", "c"], ast.Return(ast.Op("+", [ast.Var("b"), ast.Var("c")]))))
 		self.assertEqual(parse("fun ()(a) end"), ast.Fun("()", ["a"], ast.Block([])))
 		self.assertEqual(parse("fun []() end"), ast.Fun("[]", [], ast.Block([])))
 		self.assertRaises(SyntaxError, parse, "fun <===>() end")
@@ -128,10 +128,12 @@ class TestParse(unittest.TestCase):
 	def test_factor(self):
 		self.assertEqual(parse("4 * 5", "repl_exp"), ast.Op("*", [ast.Int(4), ast.Int(5)]))
 		self.assertEqual(parse("4 / 5", "repl_exp"), ast.Op("/", [ast.Int(4), ast.Int(5)]))
+		self.assertEqual(parse("3 / 4 / 5", "repl_exp"), ast.Op("/", [ast.Op("/", [ast.Int(3), ast.Int(4)]), ast.Int(5)]))
 		self.assertEqual(parse("4 % 5", "repl_exp"), ast.Op("%", [ast.Int(4), ast.Int(5)]))
 		self.assertEqual(parse("4 % 5 + 3", "repl_exp"), ast.Op("+", [ast.Op("%", [ast.Int(4), ast.Int(5)]), ast.Int(3)]))
 	def test_term(self):
 		self.assertEqual(parse("4 + 5", "repl_exp"), ast.Op("+", [ast.Int(4), ast.Int(5)]))
+		self.assertEqual(parse("4 - 5 - 6", "repl_exp"), ast.Op("-", [ast.Op("-", [ast.Int(4), ast.Int(5)]), ast.Int(6)]))
 		self.assertEqual(parse("3 < 4 - -5", "repl_exp"), ast.Op("<", [ast.Int(3), ast.Op("-", [ast.Int(4), ast.Int(-5)])]))
 	def test_compare(self):
 		self.assertEqual(parse("4 < 5", "repl_exp"), ast.Op("<", [ast.Int(4), ast.Int(5)]))
@@ -144,8 +146,10 @@ class TestParse(unittest.TestCase):
 		self.assertEqual(parse("true and false", "repl_exp"), ast.Op("and", [ast.Bool(True), ast.Bool(False)]))
 	def test_or(self):
 		self.assertEqual(parse("true or false", "repl_exp"), ast.Op("or", [ast.Bool(True), ast.Bool(False)]))
+	def test_range(self):
+		self.assertEqual(parse("3 .. 4", "repl_exp"), ast.Op("..", [ast.Int(3), ast.Int(4)]))
 	def test_ternary(self):
-		self.assertEqual(parse("true and false ? 4 : 5", "repl_exp"), ast.Op("?:", [ast.Op("and", [ast.Bool(True), ast.Bool(False)]), ast.Int(4), ast.Int(5)]))
+		self.assertEqual(parse("true and false ? 4 : 5 .. 6", "repl_exp"), ast.Op("?:", [ast.Op("and", [ast.Bool(True), ast.Bool(False)]), ast.Int(4), ast.Op("..", [ast.Int(5), ast.Int(6)])]))
 
 class TestEval(unittest.TestCase):
 	def test_assign(self):
@@ -210,6 +214,8 @@ class TestEval(unittest.TestCase):
 		})), "A method")
 	def test_op(self):
 		self.assertEqual(eval(ast.Op("[]", [ast.List([ast.Int(1), ast.Int(2), ast.Int(3), ast.Int(4)]), ast.Int(2)]), Env({})), 3)
+		self.assertEqual(eval(ast.Op("[]", [ast.List([ast.Int(1), ast.Int(2), ast.Int(3), ast.Int(4)]), ast.Op("..", [ast.Int(1), ast.Int(2)])]), Env({})), [2, 3])
+		self.assertEqual(eval(ast.Op("[]", [ast.List([ast.Int(1), ast.Int(2), ast.Int(3), ast.Int(4)]), ast.List([ast.Int(0), ast.Int(0), ast.Int(3)])]), Env({})), [1, 1, 4])
 		env = Env({"a": [1, 2, 3]})
 		eval(ast.Op("[]=", [ast.Var("a"), ast.Int(2), ast.Int(6)]), env)
 		self.assertEqual(env["a"], [1, 2, 6])
@@ -233,6 +239,9 @@ class TestEval(unittest.TestCase):
 		self.assertEqual(eval(ast.Op("and", [ast.Int(5), ast.Int(0)]), Env({})), False)
 		self.assertEqual(eval(ast.Op("or", [ast.Int(5), ast.Int(0)]), Env({})), True)
 		self.assertEqual(eval(ast.Op("or", [ast.Int(0), ast.Int(0)]), Env({})), False)
+		self.assertEqual(eval(ast.Op("..", [ast.Int(4), ast.Int(9)]), Env({})), [4, 5, 6, 7, 8, 9])
+		self.assertRaises(TypeError, eval, ast.Op("..", [ast.Float(4.5), ast.Float(9.5)]), Env({}))
+		self.assertEqual(eval(ast.Op("..", [ast.String("a"), ast.String("f")]), Env({})), ["a", "b", "c", "d", "e", "f"])
 		self.assertEqual(eval(ast.Op("?:", [ast.Bool(True), ast.Int(4), ast.Int(5)]), Env({})), 4)
 		self.assertEqual(eval(ast.Op("?:", [ast.Bool(False), ast.Int(4), ast.Int(5)]), Env({})), 5)
 	def test_to_string(self):

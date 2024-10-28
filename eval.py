@@ -166,18 +166,17 @@ def do_op(op, *args):
 		return args[0][op](*args[1 : ])
 	match op:
 		case "[]":
-			try:
-				return args[0][args[1]]
-			except IndexError:
-				raise CustomException(1)
+			if isinstance(args[1], list):
+				return [args[0][index] for index in args[1]]
+			return args[0][args[1]]
 		case "[]=":
 			args[0][args[1]] = args[2]
 		case "()":
 			return args[0](*args[1 : ])
-		case "unot":
-			return not args[0]
 		case "u-":
 			return -args[0]
+		case "unot":
+			return not args[0]
 		case "*":
 			return args[0] * args[1]
 		case "/":
@@ -204,6 +203,12 @@ def do_op(op, *args):
 			return bool(args[0] and args[1])
 		case "or":
 			return bool(args[0] or args[1])
+		case "..":
+			if isinstance(args[0], int) and isinstance(args[1], int):
+				return list(range(args[0], args[1] + 1))
+			if isinstance(args[0], str) and isinstance(args[1], str):
+				return [chr(char) for char in range(ord(args[0]), ord(args[1]) + 1)]
+			raise TypeError(f".. only works with integers and length 1 strings")
 		case "?:":
 			if do_op("to_bool", args[0]):
 				return args[1]

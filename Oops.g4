@@ -50,7 +50,7 @@ switch: 'switch' exp case* default? 'end';
 case: 'case' exp (',' exp)* 'then' block;
 default: 'default' block;
 fun: 'fun' fun_name params block 'end';
-fun_name: NAME | '[' ']' | '[' ']' '=' | '(' ')' | 'unot' | 'u-' | '*' | '/' | '%' | '+' | '-' | '<=' | '==' | '!=' | '>' | '>=' | 'and' | 'or';
+fun_name: NAME | '[' ']' | '[' ']' '=' | '(' ')' | 'u-' | 'unot' | '*' | '/' | '%' | '+' | '-' | '<=' | '==' | '!=' | '>' | '>=' | 'and' | 'or';
 params
 	: '(' ')'
 	| '(' NAME (',' NAME)* ')'
@@ -91,6 +91,7 @@ exp
 	| exp compare_op exp	# compare
 	| exp 'and' exp			# and
 	| exp 'or' exp			# or
+	| exp '..' exp			# range
 	| exp '?' exp ':' exp	# ternary
 	;
 string: STRING;

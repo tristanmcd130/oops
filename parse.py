@@ -112,6 +112,8 @@ class OopsTransformer(OopsVisitor):
 		return ast.Op("and", [self.visit(ctx.exp(0)), self.visit(ctx.exp(1))])
 	def visitOr(self, ctx: OopsParser.OrContext):
 		return ast.Op("or", [self.visit(ctx.exp(0)), self.visit(ctx.exp(1))])
+	def visitRange(self, ctx: OopsParser.RangeContext):
+		return ast.Op("..", [self.visit(ctx.exp(0)), self.visit(ctx.exp(1))])
 	def visitTernary(self, ctx: OopsParser.TernaryContext):
 		return ast.Op("?:", [self.visit(ctx.exp(0)), self.visit(ctx.exp(1)), self.visit(ctx.exp(2))])
 	def visitRepl_exp(self, ctx: OopsParser.Repl_expContext):
