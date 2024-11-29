@@ -1,0 +1,104 @@
+trait Iterator
+	get
+	next
+	done
+	def map(f)
+		class MapIterator uses Iterator
+			def init(it)
+				self.it = it
+			end
+			def get()
+				f(self.it.get())
+			end
+			def next()
+				MapIterator(self.it.next())
+			end
+			def done()
+				self.it.done()
+			end
+		end
+		MapIterator(self)
+	end
+	def for_each(f)
+		if not self.done() then
+			f(self.get())
+			self.next().for_each(f)
+		end
+	end
+	def filter(f)
+		class FilterIterator uses Iterator
+			def init(it)
+				self.it = it
+			end
+			def get()
+				if f(self.it.get()) then
+					self.it.get()
+				else
+					self.it = self.it.next()
+					self.get()
+				end
+			end
+			def next()
+				FilterIterator(self.it.next())
+			end
+			def done()
+				self.it.done()
+			end
+		end
+		FilterIterator(self)
+	end
+	def fold(f, i)
+		if self.done() then
+			i
+		else
+			self.next().fold(f, f(i, self.get()))
+		end
+	end
+	def sum()
+		self.fold(\x, y -> x + y, 0)
+	end
+	def collect()
+		if self.done() then
+			[]
+		else
+			self.get() :: self.next().collect()
+		end
+	end
+end
+
+class FibIterator uses Iterator
+	def init(c, n)
+		self.c = c
+		self.n = n
+	end
+	def get()
+		self.c
+	end
+	def next()
+		FibIterator(self.n, self.c + self.n)
+	end
+	def done()
+		self.c > 1.7e308
+	end
+end
+
+print(FibIterator(1, 1).collect())
+
+class A
+	def method()
+		print("A method")
+	end
+end
+
+class B extends A
+	def method()
+		print("B method")
+	end
+	def test()
+		super.method()
+	end
+end
+
+class C extends B end
+
+C().test()
