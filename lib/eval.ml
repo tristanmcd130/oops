@@ -1,4 +1,5 @@
 open Exp
+open Lexing
 
 let rec eval (ast: Ast.t) (env: Env.t): Exp.t =
   match ast with
@@ -21,7 +22,7 @@ let rec eval (ast: Ast.t) (env: Env.t): Exp.t =
     let v' = eval v env in
     Exp.add_field e' f v';
     v'
-  | ADef (n, p, b) -> 
+  | ADef (n, p, b) ->
     let f: Exp.t = EFunction (Exp.make_function n p b env) in
     Env.add env n f;
     f
@@ -30,7 +31,7 @@ let rec eval (ast: Ast.t) (env: Env.t): Exp.t =
   | ASuper (n, a) ->
     let self = Env.find env "self" in
     let super = Env.find env "super" in
-    call (Exp.get_method self ?start_class: (Some (Exp.to_class super)) n) (List.map (fun x -> eval x env) a)
+    call (Exp.dot self ?start_class: (Some (Exp.to_class super)) n) (List.map (fun x -> eval x env) a)
   | AClass (n, s, ts, ms) ->
     let s' = match s with Some x -> Env.find env x | None -> EClass Exp.object_class in
     let ts' = List.map (fun t -> Exp.to_trait (Env.find env t)) ts in
@@ -44,24 +45,53 @@ let rec eval (ast: Ast.t) (env: Env.t): Exp.t =
     Env.add env n t;
     t
   | AIf ((c, b) :: cs) -> if bool_of_exp (eval c env) then eval b env else eval (AIf cs) env
+  | ALet (a, b) ->
+    let let_env = Env.make [] (Some env) in
+    List.iter (fun x -> eval x let_env |> ignore) a;
+    eval b let_env
+  | AMatch (e, []) -> Exp.make_null ()
+  | AMatch (e, (p, c) :: cs) ->
+    (match match_case (eval e env) p with
+    | Some s -> eval c (Env.make s (Some env))
+    | None -> eval (AMatch (e, cs)) env)
+  | AImport f -> run_file f env
 and call (func: Exp.t) (args: Exp.t list): Exp.t =
   match func with
   | EFunction f -> Exp.call_function f args eval
-  | EPrimitive (p, _) -> p args
+  | EPrimitive p -> p args
   | EClass _ ->
-    let obj = call (Exp.get_method func "new") args in
-    ignore (call (Exp.get_method obj "init") args);
+    let obj = call (Exp.dot func "new") args in
+    ignore (call (Exp.dot obj "init") args);
     obj
   | _ -> failwith "Not callable"
 and string_of_exp (object': Exp.t): string =
-  match call (Exp.get_method object' "to_string") [] with
-  | EString (s, _) -> s
+  match call (Exp.dot object' "to_string") [] with
+  | EString s -> s
   | _ -> failwith "Not a string"
 and bool_of_exp (object': Exp.t): bool =
-  match call (Exp.get_method object' "to_bool") [] with
-  | EBool (b, _) -> b
-  | _ -> failwith "Not a bool";;
+  match call (Exp.dot object' "to_bool") [] with
+  | EBool b -> b
+  | _ -> failwith "Not a bool"
+and match_case (exp: Exp.t) (ast: Ast.t): (string * Exp.t) list option =
+  match (exp, ast) with
+  | (EBool b, ABool b') -> if b = b' then Some [] else None
+  | (ENumber n, ANumber n') -> if n = n' then Some [] else None
+  | (EString s, AString s') -> if s = s' then Some [] else None
+  | (EList [], AList []) -> Some []
+  | (EList (l :: ls), AList (l' :: ls')) ->
+    (match (match_case l l', match_case (EList ls) (AList ls')) with
+    | (Some s, Some s') -> Some (s @ s')
+    | _ -> None)
+  | (e, AVar v) -> Some [(v, e)]
+  | (e, ACall (AVar c, fs)) -> if Exp.class_name (Exp.class_of e) = c then List.fold_left (fun x y -> match (x, y) with (Some x, Some y) -> Some (x @ y) | _ -> None) (Some []) (List.map2 match_case (Exp.field_values e) fs) else None
+  | (EList (l :: ls), ACall (ADot (t, "::"), [h])) ->
+    (match (match_case l h, match_case (EList ls) t) with
+    | (Some s, Some s') -> Some (s @ s')
+    | _ -> None)
+  | _ -> None
+and run_file (filename: string) (env: Env.t) =
+  eval (Parser.prog Lexer.read (from_channel (In_channel.open_text filename))) env;;
 
-Exp.add_method Exp.object_class "print" (Exp.make_primitive (fun [self] -> print_endline (match call (Exp.get_method self "to_string") [] with EString (s, _) -> s | _ -> failwith "Not a string"); Exp.make_null ()));
-Exp.add_method Exp.list_class "to_string" (Exp.make_primitive (fun [EList (self, _)] -> Exp.make_string ("[" ^ (String.concat ", " (List.map string_of_exp self)) ^ "]")));
-Exp.add_method Exp.dict_class "to_string" (Exp.make_primitive (fun [EDict (self, _)] -> Exp.make_string ("{" ^ (String.concat ", " (List.map (fun (x, y) -> (string_of_exp x) ^ ": " ^ (string_of_exp y)) (self |> Hashtbl.to_seq |> List.of_seq))) ^ "}")));
+Exp.add_methods Exp.object_class [("print", Exp.make_primitive (fun [self] -> print_endline (match call (Exp.dot self "to_string") [] with EString s -> s | _ -> failwith "Not a string"); Exp.make_null ()))];
+Exp.add_methods Exp.list_class [("to_string", Exp.make_primitive (fun [EList self] -> Exp.make_string ("[" ^ (String.concat ", " (List.map string_of_exp self)) ^ "]")))];
+Exp.add_methods Exp.dict_class [("to_string", Exp.make_primitive (fun [EDict self] -> Exp.make_string ("{" ^ (String.concat ", " (List.map (fun (x, y) -> (string_of_exp x) ^ ": " ^ (string_of_exp y)) (self |> Hashtbl.to_seq |> List.of_seq))) ^ "}")))];

@@ -32,9 +32,15 @@ rule read =
 	| "then"	{THEN}
 	| "elseif"	{ELSEIF}
 	| "else"	{ELSE}
+	| "let"		{LET}
+	| "in"		{IN}
 	| "and"		{AND}
 	| "or"		{OR}
 	| "not"		{NOT}
+	| "import"	{IMPORT}
+	| "fun"		{FUN}
+	| "match"	{MATCH}
+	| "case"	{CASE}
 	| id		{ID (Lexing.lexeme lexbuf)}
 	| ','		{COMMA}
 	| '('		{LPAREN}
@@ -57,8 +63,6 @@ rule read =
 	| '='		{EQUAL}
 	| "::"		{CONS}
 	| ':'		{COLON}
-	| "->"		{ARROW}
-	| '\\'		{BACKSLASH}
 	| '#'		{skip_comment lexbuf}
 	| eof		{EOF}
 	| _			{raise (SyntaxError ("Unexpected character: " ^ Lexing.lexeme lexbuf))}

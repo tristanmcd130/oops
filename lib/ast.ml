@@ -17,3 +17,6 @@ type t =
 | AClass of string * string option * string list * (string * string list * t) list (* name, superclass, traits, methods *)
 | ATrait of string * string list * (string * string list * t) list (* name, abstract methods, methods *)
 | AIf of (t * t) list
+| ALet of t list * t
+| AMatch of t * (t * t) list
+| AImport of string
