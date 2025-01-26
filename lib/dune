@@ -1,9 +1,9 @@
-(ocamllex lexer)
+; (ocamllex lexer)
 
-(menhir
- (modules parser)
- (explain true))
+; (menhir
+;  (modules parser)
+;  (explain true))
 
 (library
  (name oops)
- (modules lexer parser ast exp eval))
+ (modules exp value env eval))
