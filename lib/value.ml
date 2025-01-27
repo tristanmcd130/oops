@@ -1,5 +1,5 @@
 type t = {class': class'; repr: repr}
-and class' = {name: string; super: class' option; meta: class'; methods: (string, t) Hashtbl.t}
+and class' = {name: string; super: class' option; meta: class'; fields: (string, t) Hashtbl.t; methods: (string, t) Hashtbl.t}
 and repr =
 | RNull
 | RBool of bool
@@ -11,17 +11,19 @@ and repr =
 | RObject of (string, t) Hashtbl.t
 | RClass of class'
 
-let rec object_class = {name = "Object"; super = None; meta = object_metaclass; methods = Hashtbl.create 16}
-and object_metaclass = {name = "ObjectMetaclass"; super = Some class_class; meta = class_class; methods = Hashtbl.create 16}
-and class_class = {name = "Class"; super = Some object_class; meta = class_metaclass; methods = Hashtbl.create 16}
-and class_metaclass = {name = "ClassMetaclass"; super = Some object_metaclass; meta = class_class; methods = Hashtbl.create 16}
-let null_class = {name = "Null"; super = Some object_class; meta = {name = "NullMetaclass"; super = Some object_metaclass; meta = class_class; methods = Hashtbl.create 16}; methods = Hashtbl.create 16}
-let bool_class = {name = "Bool"; super = Some object_class; meta = {name = "BoolMetaclass"; super = Some object_metaclass; meta = class_class; methods = Hashtbl.create 16}; methods = Hashtbl.create 16}
-let number_class = {name = "Number"; super = Some object_class; meta = {name = "NumberMetaclass"; super = Some object_metaclass; meta = class_class; methods = Hashtbl.create 16}; methods = Hashtbl.create 16}
-let string_class = {name = "String"; super = Some object_class; meta = {name = "StringMetaclass"; super = Some object_metaclass; meta = class_class; methods = Hashtbl.create 16}; methods = Hashtbl.create 16}
-let list_class = {name = "List"; super = Some object_class; meta = {name = "ListMetaclass"; super = Some object_metaclass; meta = class_class; methods = Hashtbl.create 16}; methods = Hashtbl.create 16}
-let function_class = {name = "Function"; super = Some object_class; meta = {name = "FunctionMetaclass"; super = Some object_metaclass; meta = class_class; methods = Hashtbl.create 16}; methods = Hashtbl.create 16}
-
+let rec object_class = {name = "Object"; super = None; meta = object_metaclass; fields = Hashtbl.create 0; methods = Hashtbl.create 16}
+and object_metaclass = {name = "ObjectMetaclass"; super = Some class_class; meta = class_class; fields = Hashtbl.create 0; methods = Hashtbl.create 16}
+and class_class = {name = "Class"; super = Some object_class; meta = class_metaclass; fields = Hashtbl.create 0; methods = Hashtbl.create 16}
+and class_metaclass = {name = "ClassMetaclass"; super = Some object_metaclass; meta = class_class; fields = Hashtbl.create 0; methods = Hashtbl.create 16}
+let make_class name super methods static_fields static_methods =
+  let super' = match super with Some s -> s | None -> object_class in
+  {name = name; super = Some super'; meta = {name = name ^ "Metaclass"; super = Some super'.meta; meta = class_class; fields = Hashtbl.create 0; methods = static_methods |> List.to_seq |> Hashtbl.of_seq}; fields = static_fields |> List.to_seq |> Hashtbl.of_seq; methods = methods |> List.to_seq |> Hashtbl.of_seq}
+let null_class = make_class "Null" (Some object_class) [] [] []
+let bool_class = make_class "Bool" (Some object_class) [] [] []
+let number_class = make_class "Number" (Some object_class) [] [] []
+let string_class = make_class "String" (Some object_class) [] [] []
+let list_class = make_class "List" (Some object_class) [] [] []
+let function_class = make_class "Function" (Some object_class) [] [] []
 let make_null () = {class' = null_class; repr = RNull}
 let make_bool bool = {class' = bool_class; repr = RBool bool}
 let make_number number = {class' = number_class; repr = RNumber number}
@@ -29,6 +31,11 @@ let make_string string = {class' = string_class; repr = RString string}
 let make_list list = {class' = bool_class; repr = RList (Array.of_list list)}
 let make_function name params body env = {class' = function_class; repr = RFunction (name, params, body, env)}
 let make_primitive func = {class' = function_class; repr = RPrimitive func}
+let of_class class' = {class' = class'.meta; repr = RClass class'}
+let to_class value =
+  match value.repr with
+  | RClass c -> c
+  | _ -> failwith "Not a class"
 
 let rec get_method_from_class class' name =
   match Hashtbl.find_opt class'.methods name with
@@ -50,17 +57,9 @@ let dot obj name =
     (match Hashtbl.find_opt o name with
     | Some f -> f
     | None -> get_method obj name)
+  | RClass c ->
+    (match Hashtbl.find_opt c.fields name with
+    | Some f -> f
+    | None -> get_method obj name)
   | _ -> get_method obj name
-
-let rec call func args eval =
-  match func.repr with
-  | RFunction (_, ps, b, e) -> eval b (Env.create (List.combine ps args) (Some e))
-  | RPrimitive p -> p args
-  | RClass _ -> call (dot func "new") [] eval
-  | _ -> failwith "Not a function"
-
-Hashtbl.replace object_metaclass.methods "new" (make_primitive (fun ({repr = RClass self} :: args) ->
-  let obj = {class' = self; repr = RObject (Hashtbl.create 16)} in
-  call (dot obj "init") args;
-  obj
-))
+let to_bool value = value.repr = RBool true
