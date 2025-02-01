@@ -23,4 +23,4 @@ val make_class: string -> class' option -> (string * t) list -> (string * t) lis
 val of_class: class' -> t
 val to_class: t -> class'
 val dot: t -> string -> t
-val to_bool: t -> bool
+val add_methods: class' -> (string * (t list -> t)) list -> unit

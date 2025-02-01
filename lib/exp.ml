@@ -14,7 +14,7 @@ type t =
 | EFor of string * t * t
 | EAssign of string * t
 | EFun of string * string list * t
-| EClass of string * string option * class_def list
+| EClass of string * t option * class_def list
 and class_def =
 | CAssign of string * t
 | CFun of string * string list * t

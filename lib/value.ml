@@ -11,10 +11,10 @@ and repr =
 | RObject of (string, t) Hashtbl.t
 | RClass of class'
 
-let rec object_class = {name = "Object"; super = None; meta = object_metaclass; fields = Hashtbl.create 0; methods = Hashtbl.create 16}
-and object_metaclass = {name = "ObjectMetaclass"; super = Some class_class; meta = class_class; fields = Hashtbl.create 0; methods = Hashtbl.create 16}
-and class_class = {name = "Class"; super = Some object_class; meta = class_metaclass; fields = Hashtbl.create 0; methods = Hashtbl.create 16}
-and class_metaclass = {name = "ClassMetaclass"; super = Some object_metaclass; meta = class_class; fields = Hashtbl.create 0; methods = Hashtbl.create 16}
+let rec object_class = {name = "Object"; super = None; meta = object_metaclass; fields = Hashtbl.create 0; methods = Hashtbl.create 0}
+and object_metaclass = {name = "ObjectMetaclass"; super = Some class_class; meta = class_class; fields = Hashtbl.create 0; methods = Hashtbl.create 0}
+and class_class = {name = "Class"; super = Some object_class; meta = class_metaclass; fields = Hashtbl.create 0; methods = Hashtbl.create 0}
+and class_metaclass = {name = "ClassMetaclass"; super = Some object_metaclass; meta = class_class; fields = Hashtbl.create 0; methods = Hashtbl.create 0}
 let make_class name super methods static_fields static_methods =
   let super' = match super with Some s -> s | None -> object_class in
   {name = name; super = Some super'; meta = {name = name ^ "Metaclass"; super = Some super'.meta; meta = class_class; fields = Hashtbl.create 0; methods = static_methods |> List.to_seq |> Hashtbl.of_seq}; fields = static_fields |> List.to_seq |> Hashtbl.of_seq; methods = methods |> List.to_seq |> Hashtbl.of_seq}
@@ -62,4 +62,24 @@ let dot obj name =
     | Some f -> f
     | None -> get_method obj name)
   | _ -> get_method obj name
-let to_bool value = value.repr = RBool true
+
+let add_methods class' methods = methods |> List.map (fun (n, v) -> (n, make_primitive v)) |> List.to_seq |> Hashtbl.replace_seq class'.methods;;
+add_methods object_class [
+  ("to_string", fun _ -> "<object>" |> make_string);
+];
+add_methods null_class [
+  ("to_string", fun _ -> make_string "null");
+  ("to_bool", fun _ -> make_bool false);
+];
+add_methods bool_class [
+  ("to_string", fun ({repr = RBool b} :: _) -> b |> string_of_bool |> make_string);
+  ("to_bool", fun (self :: _) -> self);
+];
+add_methods number_class [
+  ("to_string", fun ({repr = RNumber n} :: _) -> n |> string_of_float |> make_string);
+  ("to_bool", fun ({repr = RNumber n} :: _) -> make_bool (n = 0.0));
+];
+add_methods string_class [
+  ("to_string", fun (self :: _) -> self);
+  ("to_bool", fun ({repr = RString s} :: _) -> make_bool (s = ""));
+];
