@@ -7,7 +7,7 @@ let ws = [' ' '\t']+
 let digit = ['0'-'9']
 let frac = '.' digit*
 let exp = ['e' 'E'] ['-' '+']? digit+
-let number = digit* frac? exp?
+let number = digit+ frac? exp?
 let id = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
 
 rule read =
@@ -29,17 +29,15 @@ rule read =
 	| '.'		{DOT}
 	| "if"		{IF}
 	| "then"	{THEN}
-	| "elseif"	{ELSEIF}
 	| "else"	{ELSE}
-	| "while"	{WHILE}
-	| "do"		{DO}
-	| "for"		{FOR}
-	| "in"		{IN}
 	| '='		{EQUAL}
+	| "def"		{DEF}
 	| "class"	{CLASS}
 	| "extends"	{EXTENDS}
-	| "static"	{STATIC}
+	| "uses"	{USES}
+	| "trait"	{TRAIT}
 	| id		{ID (Lexing.lexeme lexbuf)}
+	| '#'		{skip_comment lexbuf}
 	| eof		{EOF}
 	| _			{failwith ("Illegal character: " ^ Lexing.lexeme lexbuf)}
 and read_string buf =
@@ -51,3 +49,8 @@ and read_string buf =
 	| [^ '"' '\\']+	{Buffer.add_string buf (Lexing.lexeme lexbuf); read_string buf lexbuf}
 	| eof			{failwith "String not terminated"}
 	| _				{failwith ("Illegal character in string: " ^ Lexing.lexeme lexbuf)}
+and skip_comment =
+	parse
+	| '\n'	{new_line lexbuf; read lexbuf}
+	| eof	{EOF}
+	| _		{skip_comment lexbuf}

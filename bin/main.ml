@@ -1,15 +1,23 @@
 open Oops
 open Lexing
 
-let rec repl env line_num =
+let global_env = Env.create [
+  ("print", Value.VPrimitive (fun [x] -> Eval.to_string x |> print_endline; VNull))
+] None
+
+let rec repl line_num =
   Printf.printf "%d> " line_num;
   flush stdout;
-  let result = Eval.eval (from_channel stdin |> Parser.prog Lexer.read) env in
+  let result = Eval.eval (from_channel stdin |> Parser.prog Lexer.read) global_env in
   Eval.to_string result |> print_endline;
-  Env.bind env (Printf.sprintf "_%d" line_num) result;
-  repl env (line_num + 1)
+  Env.bind global_env (Printf.sprintf "_%d" line_num) result |> ignore;
+  repl (line_num + 1)
 
-let global_env = Env.create [
-  ("print", Value.make_primitive (fun [x] -> Eval.to_string x |> print_endline; Value.make_null ()))
-] None
-let () = repl global_env 1
+let run_file filename = Eval.eval (In_channel.open_text filename |> from_channel |> Parser.prog Lexer.read) global_env |> ignore;;
+
+let () =
+  run_file "prelude.oops";
+  match Sys.argv with
+  | [|_|] -> repl 1
+  | [|_; f|] -> run_file f
+  | _ -> print_endline ("Usage: " ^ Sys.argv.(0) ^ " [file]")

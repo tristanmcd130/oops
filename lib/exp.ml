@@ -5,17 +5,12 @@ type t =
 | ENumber of float
 | EString of string
 | EList of t list
-| ELambda of string list * t
+| EFun of string list * t
 | EVar of string
 | EDot of t * string
 | ECall of t * t list
-| EIf of (t * t) list
-| EWhile of t * t
-| EFor of string * t * t
+| EIf of t * t * t
 | EAssign of string * t
-| EFun of string * string list * t
-| EClass of string * t option * class_def list
-and class_def =
-| CAssign of string * t
-| CFun of string * string list * t
-| CStaticFun of string * string list * t
+| EDef of string * string list * t
+| EClass of string * t option * t option * (string * string list * t) list
+| ETrait of string * string list * (string * string list * t) list

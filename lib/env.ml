@@ -8,4 +8,6 @@ let rec lookup env name =
     match env.parent with
     | Some p -> lookup p name
     | None -> failwith (name ^ " not found")
-let bind env name value = Hashtbl.replace env.bindings name value
+let bind env name value =
+  Hashtbl.replace env.bindings name value;
+  value

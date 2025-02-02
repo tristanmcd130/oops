@@ -13,16 +13,13 @@
 %token DOT
 %token IF
 %token THEN
-%token ELSEIF
 %token ELSE
-%token WHILE
-%token DO
-%token FOR
-%token IN
+%token DEF
 %token EQUAL
 %token CLASS
 %token EXTENDS
-%token STATIC
+%token USES
+%token TRAIT
 %token EOF
 %start <Exp.t> prog
 %%
@@ -32,12 +29,17 @@ prog: b = block; EOF	{b}
 block: ss = stmt*	{EBlock ss}
 
 stmt:
-	| WHILE; c = exp; DO; b = block; END											{EWhile (c, b)}
-	| FOR; n = ID; IN; l = exp; DO; b = block; END									{EFor (n, l, b)}
-	| n = ID; EQUAL; e = exp														{EAssign (n, e)}
-	| FUN; n = ID; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{EFun (n, ps, b)}
-	| CLASS; n = ID; e = extends?; ds = class_def*; END								{Exp.EClass (n, e, ds)}
-	| e = exp																		{e}
+	| n = ID; EQUAL; e = exp									{EAssign (n, e)}
+	| d = def													{match d with (n, ps, b) -> EDef (n, ps, b)}
+	| CLASS; n = ID; e = extends?; u = uses?; ds = def*; END	{EClass (n, e, u, ds)}
+	| TRAIT; n = ID; ams = ID*; ms = def*; END					{Exp.ETrait (n, ams, ms)}
+	| e = exp													{e}
+
+def: DEF; n = ID; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{(n, ps, b)}
+
+extends: EXTENDS; e = exp	{e}
+
+uses: USES; e = exp	{e}
 
 exp:
 	| NULL																	{ENull}
@@ -45,21 +47,8 @@ exp:
 	| n = NUMBER															{ENumber n}
 	| s = STRING															{EString s}
 	| LBRACKET; es = separated_list(COMMA, exp); RBRACKET					{EList es}
-	| FUN; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{ELambda (ps, b)}
+	| FUN; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{EFun (ps, b)}
 	| v = ID																{EVar v}
 	| e = exp; DOT; f = ID													{EDot (e, f)}
 	| f = exp; LPAREN; a = separated_list(COMMA, exp); RPAREN				{ECall (f, a)}
-	| IF; c = exp; THEN; t = block; es = elseif*; e = else_; END			{EIf (((c, t) :: es) @ e)}
-
-elseif: ELSEIF; c = exp; THEN; t = block	{(c, t)}
-
-else_:
-	|					{[]}
-	| ELSE; b = block	{[(EBool true, b)]}
-
-extends: EXTENDS; e = exp	{e}
-
-class_def:
-	| n = ID; EQUAL; e = exp																{CAssign (n, e)}
-	| FUN; n = ID; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END			{CFun (n, ps, b)}
-	| STATIC; FUN; n = ID; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{CStaticFun (n, ps, b)}
+	| IF; c = exp; THEN; t = block; ELSE; e = block; END					{EIf (c, t, e)}
