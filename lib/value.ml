@@ -88,6 +88,12 @@ add_methods null_class [("to_string", fun _ -> VString "null")];
 add_methods bool_class [("to_string", fun (VBool self :: _) -> VString (string_of_bool self))];
 add_methods number_class [("to_string", fun (VNumber self :: _) -> VString (string_of_float self))];
 add_methods string_class [("to_string", fun (self :: _) -> self)];
+add_methods list_class [
+  ("head", fun [VList self] ->  List.hd self);
+  ("tail", fun [VList self] ->  VList (List.tl self));
+  ("at", fun [VList self; VNumber index] -> List.nth self (int_of_float index));
+];
+add_methods dict_class [("at", fun [VDict self; index] -> Hashtbl.find self index)];
 add_methods function_class [("to_string", fun _ -> VString "<function>")];
 add_methods class_class [("to_string", fun _ -> VString "<class>")];
 add_methods trait_class [("to_string", fun _ -> VString "<trait>")];

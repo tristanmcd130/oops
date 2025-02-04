@@ -44,7 +44,7 @@ and call func args =
   | VFunction (ps, b, e) -> eval b (Env.create (List.combine ps args) (Some e))
   | VPrimitive p -> p args
   | VClass _ -> call (Value.dot func "new") args
-  | _ -> failwith "Not a function"
+  | _ -> failwith "Not a function"  
 
 let to_string obj =
   match call (Value.dot obj "to_string") [] with
