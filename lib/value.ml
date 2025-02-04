@@ -26,8 +26,6 @@ let trait_class = {super = Some object_class; trait = empty_trait; methods = Has
 let rec get_methods class' =
   (class'.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ (class'.trait.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ (match class'.super with Some c -> get_methods c | None -> [])
 let uses_trait class' trait =
-  print_endline ("CLASS METHODS: " ^ String.concat ", " (get_methods class'));
-  print_endline ("TRAIT REQS: " ^ String.concat ", " trait.abs_methods);
   let rec subset a b = List.for_all (fun x -> List.mem x b) a in
   subset trait.abs_methods (get_methods class')
 let make_class super trait methods =

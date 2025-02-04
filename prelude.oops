@@ -1,12 +1,24 @@
 print("Welcome to oops")
 
-trait Printable
-	to_string
+trait Iterator
+	get
+	next
+	done
 end
 
-class Point uses Printable
-	def init(x, y)
-		self.x = x
-		self.y = y
+class Range uses Iterator
+	def init(start, stop, step)
+		self.start = start
+		self.stop = stop
+		self.step = step
+	end
+	def get()
+		self.start
+	end
+	def next()
+		Range(self.start + self.step, self.stop, self.step)
+	end
+	def done()
+		self.start > self.stop
 	end
 end
