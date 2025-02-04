@@ -4,6 +4,7 @@ type t =
 | VNumber of float
 | VString of string
 | VList of t list
+| VDict of (t, t) Hashtbl.t
 | VFunction of string list * Exp.t * t Env.t
 | VPrimitive of (t list -> t)
 | VObject of {class': class'; fields: (string, t) Hashtbl.t}
@@ -19,6 +20,7 @@ let bool_class = {super = Some object_class; trait = empty_trait; methods = Hash
 let number_class = {super = Some object_class; trait = empty_trait; methods = Hashtbl.create 16}
 let string_class = {super = Some object_class; trait = empty_trait; methods = Hashtbl.create 16}
 let list_class = {super = Some object_class; trait = empty_trait; methods = Hashtbl.create 16}
+let dict_class = {super = Some object_class; trait = empty_trait; methods = Hashtbl.create 16}
 let function_class = {super = Some object_class; trait = empty_trait; methods = Hashtbl.create 16}
 let class_class = {super = Some object_class; trait = empty_trait; methods = Hashtbl.create 16}
 let trait_class = {super = Some object_class; trait = empty_trait; methods = Hashtbl.create 16}
@@ -45,6 +47,7 @@ let class_of = function
 | VNumber _ -> number_class
 | VString _ -> string_class
 | VList _ -> list_class
+| VDict _ -> dict_class
 | VFunction _ | VPrimitive _ -> function_class
 | VClass _ -> class_class
 | VTrait _ -> trait_class

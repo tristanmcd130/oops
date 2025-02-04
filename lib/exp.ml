@@ -5,6 +5,7 @@ type t =
 | ENumber of float
 | EString of string
 | EList of t list
+| EDict of (t * t) list
 | EFun of string list * t
 | EVar of string
 | EDot of t * string

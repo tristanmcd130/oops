@@ -22,6 +22,9 @@ rule read =
 	| '['		{LBRACKET}
 	| ']'		{RBRACKET}
 	| ','		{COMMA}
+	| '{'		{LBRACE}
+	| '}'		{RBRACE}
+	| ':'		{COLON}
 	| "fun"		{FUN}
 	| '('		{LPAREN}
 	| ')'		{RPAREN}

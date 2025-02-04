@@ -5,6 +5,9 @@
 %token LBRACKET
 %token RBRACKET
 %token COMMA
+%token LBRACE
+%token RBRACE
+%token COLON
 %token FUN
 %token LPAREN
 %token RPAREN
@@ -52,9 +55,12 @@ exp:
 	| n = NUMBER															{ENumber n}
 	| s = STRING															{EString s}
 	| LBRACKET; es = separated_list(COMMA, exp); RBRACKET					{EList es}
+	| LBRACE; es = separated_list(COMMA, dict_entry); RBRACE				{EDict es}
 	| FUN; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{EFun (ps, b)}
 	| v = ID																{EVar v}
 	| e = exp; DOT; f = ID													{EDot (e, f)}
 	| f = exp; LPAREN; a = separated_list(COMMA, exp); RPAREN				{ECall (f, a)}
 	| IF; c = exp; THEN; t = block; ELSE; e = block; END					{EIf (c, t, e)}
 	| LET; a = separated_list(COMMA, assign); IN; b = block; END			{ELet (a, b)}
+
+dict_entry: k = exp; COLON; v = exp	{(k, v)}

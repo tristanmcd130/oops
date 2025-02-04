@@ -4,6 +4,7 @@ type t =
 | VNumber of float
 | VString of string
 | VList of t list
+| VDict of (t, t) Hashtbl.t
 | VFunction of string list * Exp.t * t Env.t
 | VPrimitive of (t list -> t)
 | VObject of {class': class'; fields: (string, t) Hashtbl.t}
@@ -23,6 +24,7 @@ val bool_class: class'
 val number_class: class'
 val string_class: class'
 val list_class: class'
+val dict_class: class'
 val function_class: class'
 val class_class: class'
 val trait_class: class'
