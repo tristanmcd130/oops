@@ -9,7 +9,8 @@ let rec repl line_num =
   Printf.printf "%d> " line_num;
   flush stdout;
   let result = Eval.eval (from_channel stdin |> Parser.prog Lexer.read) global_env in
-  Eval.to_string result |> print_endline;
+  if result <> VNull then
+    Eval.to_string result |> print_endline;
   Env.bind global_env (Printf.sprintf "_%d" line_num) result |> ignore;
   repl (line_num + 1)
 

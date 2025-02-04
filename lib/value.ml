@@ -9,31 +9,34 @@ type t =
 | VObject of {class': class'; fields: (string, t) Hashtbl.t}
 | VClass of class'
 | VTrait of trait
-and class' = {super: class' option; trait: trait option; methods: (string, t) Hashtbl.t}
+and class' = {super: class' option; trait: trait; methods: (string, t) Hashtbl.t}
 and trait = {abs_methods: string list; methods: (string, t) Hashtbl.t}
 
-let object_class = {super = None; trait = None; methods = Hashtbl.create 16}
-let null_class = {super = Some object_class; trait = None; methods = Hashtbl.create 16}
-let bool_class = {super = Some object_class; trait = None; methods = Hashtbl.create 16}
-let number_class = {super = Some object_class; trait = None; methods = Hashtbl.create 16}
-let string_class = {super = Some object_class; trait = None; methods = Hashtbl.create 16}
-let list_class = {super = Some object_class; trait = None; methods = Hashtbl.create 16}
-let function_class = {super = Some object_class; trait = None; methods = Hashtbl.create 16}
-let class_class = {super = Some object_class; trait = None; methods = Hashtbl.create 16}
-let trait_class = {super = Some object_class; trait = None; methods = Hashtbl.create 16}
+let empty_trait = {abs_methods = []; methods = Hashtbl.create 0}
+let object_class = {super = None; trait = empty_trait; methods = Hashtbl.create 16}
+let null_class = {super = Some object_class; trait = empty_trait; methods = Hashtbl.create 16}
+let bool_class = {super = Some object_class; trait = empty_trait; methods = Hashtbl.create 16}
+let number_class = {super = Some object_class; trait = empty_trait; methods = Hashtbl.create 16}
+let string_class = {super = Some object_class; trait = empty_trait; methods = Hashtbl.create 16}
+let list_class = {super = Some object_class; trait = empty_trait; methods = Hashtbl.create 16}
+let function_class = {super = Some object_class; trait = empty_trait; methods = Hashtbl.create 16}
+let class_class = {super = Some object_class; trait = empty_trait; methods = Hashtbl.create 16}
+let trait_class = {super = Some object_class; trait = empty_trait; methods = Hashtbl.create 16}
 
+let rec get_methods class' =
+  (class'.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ (class'.trait.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ (match class'.super with Some c -> get_methods c | None -> [])
 let uses_trait class' trait =
-  let rec get_methods class' =
-    (class'.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ (match class'.trait with Some t -> t.methods |> Hashtbl.to_seq_keys |> List.of_seq | None -> []) @ (match class'.super with Some c -> get_methods c | None -> [])
-  in let rec subset a b = List.for_all (fun x -> List.mem x b) a
-  in subset (get_methods class') trait.abs_methods
-let make_class class' trait methods =
+  print_endline ("CLASS METHODS: " ^ String.concat ", " (get_methods class'));
+  print_endline ("TRAIT REQS: " ^ String.concat ", " trait.abs_methods);
+  let rec subset a b = List.for_all (fun x -> List.mem x b) a in
+  subset trait.abs_methods (get_methods class')
+let make_class super trait methods =
   let c = {
-    super = Some (match class' with Some (VClass c) -> c | None -> object_class);
-    trait = (match trait with Some (VTrait t) -> Some t | None -> None);
+    super = Some (match super with Some (VClass c) -> c | None -> object_class);
+    trait = (match trait with Some (VTrait t) -> t | None -> empty_trait);
     methods = methods |> List.to_seq |> Hashtbl.of_seq
   } in match trait with
-  | Some (VTrait t) -> if uses_trait c t then c else failwith "Class doesn't fully implement trait"
+  | Some (VTrait t) -> if uses_trait c t then c else failwith ("Class doesn't fully implement trait: " ^ String.concat ", " (List.filter (fun x -> not (List.mem x (get_methods c))) t.abs_methods))
   | None -> c
 let make_trait abs_methods methods = {abs_methods = abs_methods; methods = methods |> List.to_seq |> Hashtbl.of_seq}
 
@@ -62,14 +65,8 @@ let rec get_method_from_class class' name = (* this function is pretty ridiculou
   match Hashtbl.find_opt class'.methods name with
   | Some m -> m |> bind_super class'.super
   | None ->
-    match class'.trait with
-    | Some t ->
-      (match Hashtbl.find_opt t.methods name with
-      | Some m -> m |> bind_super class'.super
-      | None ->
-        match class'.super with
-        | Some c -> get_method_from_class c name
-        | None -> failwith ("Method " ^ name ^ " not defined"))
+    match Hashtbl.find_opt class'.trait.methods name with
+    | Some m -> m |> bind_super class'.super
     | None ->
       match class'.super with
       | Some c -> get_method_from_class c name

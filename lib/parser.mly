@@ -29,7 +29,8 @@ prog: b = block; EOF	{b}
 block: ss = stmt*	{EBlock ss}
 
 stmt:
-	| n = ID; EQUAL; e = exp									{EAssign (n, e)}
+	| n = ID; EQUAL; v = exp									{EAssign (n, v)}
+	| o = exp; DOT; f = ID; EQUAL; v = exp						{EDotAssign (o, f, v)}
 	| d = def													{match d with (n, ps, b) -> EDef (n, ps, b)}
 	| CLASS; n = ID; e = extends?; u = uses?; ds = def*; END	{EClass (n, e, u, ds)}
 	| TRAIT; n = ID; ams = ID*; ms = def*; END					{Exp.ETrait (n, ams, ms)}

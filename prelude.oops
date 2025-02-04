@@ -1,8 +1,12 @@
 print("Welcome to oops")
 
-class Point
+trait Printable
+	to_string
+end
+
+class Point uses Printable
 	def init(x, y)
-		x
-		y
+		self.x = x
+		self.y = y
 	end
 end

@@ -14,15 +14,28 @@ let rec eval (exp: Exp.t) env: Value.t =
   | EDot (o, f) -> Value.dot (eval o env) f
   | ECall (f, a) -> call (eval f env) (List.map (fun x -> eval x env) a)
   | EIf (c, t, e) -> eval (if eval c env = VBool true then t else e) env
-  | EAssign (n, v) -> Env.bind env n (eval v env)
-  | EDef (n, ps, b) -> Env.bind env n (VFunction (ps, b, env))
+  | EAssign (n, v) ->
+    Env.bind env n (eval v env);
+    VNull
+  | EDotAssign (o, f, v) ->
+    (match eval o env with
+    | VObject o' ->
+      Hashtbl.replace o'.fields f (eval v env);
+      VNull
+    | _ -> failwith "Cannot assign to fields of primitive")
+  | EDef (n, ps, b) ->
+    Env.bind env n (VFunction (ps, b, env));
+    VNull
   | EClass (n, s, t, ms) ->
     Env.bind env n (VClass (Value.make_class
       (match s with Some s' -> Some (eval s' env) | None -> None)
       (match t with Some t' -> Some (eval t' env) | None -> None)
       (List.map (fun (n, ps, b) -> (n, Value.VFunction (ps, b, env))) ms)
-    ))
-  | ETrait (n, ams, ms) -> Env.bind env n (VTrait (Value.make_trait ams (List.map (fun (n, ps, b) -> (n, Value.VFunction (ps, b, env))) ms)))
+    ));
+    VNull
+  | ETrait (n, ams, ms) ->
+    Env.bind env n (VTrait (Value.make_trait ams (List.map (fun (n, ps, b) -> (n, Value.VFunction (ps, b, env))) ms)));
+    VNull
 and call func args =
   match func with
   | VFunction (ps, b, e) -> eval b (Env.create (List.combine ps args) (Some e))
