@@ -2,7 +2,8 @@ open Oops
 open Lexing
 
 let global_env = Env.create [
-  ("print", Value.VPrimitive (fun [x] -> Eval.to_string x |> print_endline; VNull))
+  ("print", Value.VPrimitive (fun [x] -> Eval.to_string x |> print_endline; VNull));
+  ("add", Value.VPrimitive (fun [VNumber x; VNumber y] -> VNumber (x +. y)))
 ] None
 
 let rec repl line_num =

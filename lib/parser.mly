@@ -14,8 +14,10 @@
 %token IF
 %token THEN
 %token ELSE
-%token DEF
+%token LET
+%token IN
 %token EQUAL
+%token DEF
 %token CLASS
 %token EXTENDS
 %token USES
@@ -29,12 +31,14 @@ prog: b = block; EOF	{b}
 block: ss = stmt*	{EBlock ss}
 
 stmt:
-	| n = ID; EQUAL; v = exp									{EAssign (n, v)}
+	| a = assign												{match a with (n, v) -> EAssign (n, v)}
 	| o = exp; DOT; f = ID; EQUAL; v = exp						{EDotAssign (o, f, v)}
 	| d = def													{match d with (n, ps, b) -> EDef (n, ps, b)}
 	| CLASS; n = ID; e = extends?; u = uses?; ds = def*; END	{EClass (n, e, u, ds)}
 	| TRAIT; n = ID; ams = ID*; ms = def*; END					{Exp.ETrait (n, ams, ms)}
 	| e = exp													{e}
+
+assign: n = ID; EQUAL; v = exp	{(n, v)}
 
 def: DEF; n = ID; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{(n, ps, b)}
 
@@ -53,3 +57,4 @@ exp:
 	| e = exp; DOT; f = ID													{EDot (e, f)}
 	| f = exp; LPAREN; a = separated_list(COMMA, exp); RPAREN				{ECall (f, a)}
 	| IF; c = exp; THEN; t = block; ELSE; e = block; END					{EIf (c, t, e)}
+	| LET; a = separated_list(COMMA, assign); IN; b = block; END			{ELet (a, b)}

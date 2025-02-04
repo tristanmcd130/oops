@@ -30,6 +30,8 @@ rule read =
 	| "if"		{IF}
 	| "then"	{THEN}
 	| "else"	{ELSE}
+	| "let"		{LET}
+	| "in"		{IN}
 	| '='		{EQUAL}
 	| "def"		{DEF}
 	| "class"	{CLASS}
