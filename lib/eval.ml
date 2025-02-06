@@ -36,7 +36,8 @@ let rec eval (exp: Exp.t) env: Value.t =
     Env.bind env n (VTrait (Value.make_trait ams (List.map (fun (n, ps, b) -> (n, Value.VFunction (ps, b, env))) ms)));
     VNull
   | EImpl (tr, ty, ms) ->
-    Value.impl tr (eval ty env) (List.map (fun (n, ps, b) -> (n, Value.VFunction (ps, b, env))) ms)
+    Value.impl tr (eval ty env) (List.map (fun (n, ps, b) -> (n, Value.VFunction (ps, b, env))) ms);
+    VNull
 and call func args =
   match func with
   | VFunction (ps, b, e) -> eval b (Env.create (List.combine ps args) (Some e))

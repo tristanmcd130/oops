@@ -6,4 +6,4 @@
 
 (library
  (name oops)
- (modules lexer parser exp value env eval))
+ (modules lexer parser exp type value env eval))

@@ -1,3 +1,7 @@
+module StructType = Type.Make(struct
+  type t = Type.type'
+end)
+
 type t =
 | VNull
 | VBool of bool
@@ -65,6 +69,15 @@ let dot obj name =
     | None -> get_method obj name)
   | _ -> get_method obj name
 
+let get_method_names type' =
+  let rec get_method_names_from_trait (trait: trait) =
+     (trait.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ List.concat_map get_method_names_from_trait trait.traits
+  in (type'.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ List.concat_map get_method_names_from_trait type'.traits
+
+let impl trait type' methods =
+  methods |> List.map (fun (n, v) -> (n, VPrimitive v)) |> List.to_seq |> Hashtbl.replace_seq type'.methods;
+  (* match trait with
+  | Some t -> List.map fst methods |>  *)
 let add_methods type' methods = methods |> List.map (fun (n, v) -> (n, VPrimitive v)) |> List.to_seq |> Hashtbl.replace_seq type'.methods;;
 add_methods null_type [
   ("to_string", fun _ -> VString "null");
