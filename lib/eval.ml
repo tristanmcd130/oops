@@ -22,28 +22,26 @@ let rec eval (exp: Exp.t) env: Value.t =
     VNull
   | EDotAssign (o, f, v) ->
     (match eval o env with
-    | VObject o' ->
-      Hashtbl.replace o'.fields f (eval v env);
+    | VStruct s ->
+      Hashtbl.replace s.fields f (eval v env);
       VNull
     | _ -> failwith "Cannot assign to fields of primitive")
   | EDef (n, ps, b) ->
     Env.bind env n (VFunction (ps, b, env));
     VNull
-  | EClass (n, s, t, ms) ->
-    Env.bind env n (VClass (Value.make_class
-      (match s with Some s' -> Some (eval s' env) | None -> None)
-      (match t with Some t' -> Some (eval t' env) | None -> None)
-      (List.map (fun (n, ps, b) -> (n, Value.VFunction (ps, b, env))) ms)
-    ));
+  | EStruct (n, fs) ->
+    Env.bind env n (VType (Value.make_type fs));
     VNull
   | ETrait (n, ams, ms) ->
     Env.bind env n (VTrait (Value.make_trait ams (List.map (fun (n, ps, b) -> (n, Value.VFunction (ps, b, env))) ms)));
     VNull
+  | EImpl (tr, ty, ms) ->
+    Value.impl tr (eval ty env) (List.map (fun (n, ps, b) -> (n, Value.VFunction (ps, b, env))) ms)
 and call func args =
   match func with
   | VFunction (ps, b, e) -> eval b (Env.create (List.combine ps args) (Some e))
   | VPrimitive p -> p args
-  | VClass _ -> call (Value.dot func "new") args
+  | VType _ -> call (Value.dot func "new") args
   | _ -> failwith "Not a function"  
 
 let to_string obj =

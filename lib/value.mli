@@ -7,24 +7,23 @@ type t =
 | VDict of (t, t) Hashtbl.t
 | VFunction of string list * Exp.t * t Env.t
 | VPrimitive of (t list -> t)
-| VObject of {class': class'; fields: (string, t) Hashtbl.t}
-| VClass of class'
+| VStruct of {type': type'; fields: (string, t) Hashtbl.t}
+| VType of type'
 | VTrait of trait
-and class'
+and type'
 and trait
 
-val make_class: t option -> t option -> (string * t) list -> class'
+val make_type: string list -> type'
 val make_trait: string list -> (string * t) list -> trait
 val dot: t -> string -> t
-val add_methods: class' -> (string * (t list -> t)) list -> unit
+val add_methods: type' -> (string * (t list -> t)) list -> unit
 
-val object_class: class'
-val null_class: class'
-val bool_class: class'
-val number_class: class'
-val string_class: class'
-val list_class: class'
-val dict_class: class'
-val function_class: class'
-val class_class: class'
-val trait_class: class'
+val null_type: type'
+val bool_type: type'
+val number_type: type'
+val string_type: type'
+val list_type: type'
+val dict_type: type'
+val function_type: type'
+val type_type: type'
+val trait_type: type'
