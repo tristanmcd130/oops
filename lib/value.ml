@@ -83,17 +83,59 @@ let dot obj name =
   | _ -> get_method obj name
 
 let add_methods class' methods = methods |> List.map (fun (n, v) -> (n, VPrimitive v)) |> List.to_seq |> Hashtbl.replace_seq class'.methods;;
-add_methods object_class [("to_string", fun _ -> VString "<object>"); ("init", fun _ -> VNull)];
-add_methods null_class [("to_string", fun _ -> VString "null")];
-add_methods bool_class [("to_string", fun (VBool self :: _) -> VString (string_of_bool self))];
-add_methods number_class [("to_string", fun (VNumber self :: _) -> VString (string_of_float self))];
-add_methods string_class [("to_string", fun (self :: _) -> self)];
+add_methods object_class [
+  ("init", fun _ -> VNull);
+  ("to_string", fun _ -> VString "<object>");
+  ("==", fun [self; other] -> VBool (self = other))
+];
+add_methods null_class [
+  ("to_string", fun _ -> VString "null");
+  ("to_bool", fun _ -> VBool false);
+];
+add_methods bool_class [
+  ("to_string", fun [VBool self ] -> VString (string_of_bool self));
+  ("to_bool", fun [self] -> self);
+  ("and", fun [VBool self; VBool other] -> VBool (self && other));
+  ("or", fun [VBool self; VBool other] -> VBool (self || other));
+  ("not", fun [VBool self; VBool other] -> VBool (not self));
+];
+add_methods number_class [
+  ("to_string", fun [VNumber self ] -> VString (string_of_float self));
+  ("to_bool", fun [VNumber self] -> VBool (self <> 0.0));
+  ("+", fun [VNumber self; VNumber other] -> VNumber (self +. other));
+  ("-", fun [VNumber self; VNumber other] -> VNumber (self -. other));
+  ("*", fun [VNumber self; VNumber other] -> VNumber (self *. other));
+  ("/", fun [VNumber self; VNumber other] -> VNumber (self /. other));
+  ("%", fun [VNumber self; VNumber other] -> VNumber (mod_float self other));
+  ("<", fun [VNumber self; VNumber other] -> VBool (self < other));
+  ("<=", fun [VNumber self; VNumber other] -> VBool (self <= other));
+  ("==", fun [VNumber self; VNumber other] -> VBool (self = other));
+  ("!=", fun [VNumber self; VNumber other] -> VBool (self <> other));
+  (">", fun [VNumber self; VNumber other] -> VBool (self > other));
+  (">=", fun [VNumber self; VNumber other] -> VBool (self >= other));
+];
+add_methods string_class [
+  ("to_string", fun [self] -> self);
+  ("to_bool", fun [VString self] -> VBool (self <> ""));
+  ("+", fun [VString self; VString other] -> VString (String.cat self other));
+];
 add_methods list_class [
+  ("to_bool", fun [VList self] -> VBool (self <> []));
   ("head", fun [VList self] ->  List.hd self);
   ("tail", fun [VList self] ->  VList (List.tl self));
   ("at", fun [VList self; VNumber index] -> List.nth self (int_of_float index));
+  ("+", fun [VList self; VList other] -> VList (self @ other));
 ];
-add_methods dict_class [("at", fun [VDict self; index] -> Hashtbl.find self index)];
-add_methods function_class [("to_string", fun _ -> VString "<function>")];
-add_methods class_class [("to_string", fun _ -> VString "<class>")];
-add_methods trait_class [("to_string", fun _ -> VString "<trait>")];
+add_methods dict_class [
+  ("to_bool", fun [VDict self] -> VBool (Hashtbl.length self > 0));
+  ("at", fun [VDict self; index] -> Hashtbl.find self index);
+];
+add_methods function_class [
+  ("to_string", fun _ -> VString "<function>");
+];
+add_methods class_class [
+  ("to_string", fun _ -> VString "<class>");
+];
+add_methods trait_class [
+  ("to_string", fun _ -> VString "<trait>");
+];

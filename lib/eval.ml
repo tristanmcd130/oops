@@ -14,7 +14,7 @@ let rec eval (exp: Exp.t) env: Value.t =
   | EVar v -> Env.lookup env v
   | EDot (o, f) -> Value.dot (eval o env) f
   | ECall (f, a) -> call (eval f env) (List.map (fun x -> eval x env) a)
-  | EIf (c, t, e) -> eval (if eval c env = VBool true then t else e) env
+  | EIf (c, t, e) -> eval (if call (Value.dot (eval c env) "to_bool") [] = VBool true then t else e) env
   | ELet ([], b) -> eval b env
   | ELet ((n, v) :: ds, b) -> eval (ELet (ds, b)) (Env.create [(n, eval v env)] (Some env))
   | EAssign (n, v) ->

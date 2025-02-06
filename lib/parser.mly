@@ -25,7 +25,28 @@
 %token EXTENDS
 %token USES
 %token TRAIT
+%token AND
+%token OR
+%token NOT
+%token PLUS
+%token MINUS
+%token STAR
+%token SLASH
+%token PERCENT
+%token LT
+%token LE
+%token EQ
+%token NE
+%token GT
+%token GE
+%token CONS
 %token EOF
+%left OR
+%left AND
+%left LT LE EQ NE GT GE
+%left PLUS MINUS
+%left STAR SLASH PERCENT
+%nonassoc NOT
 %start <Exp.t> prog
 %%
 
@@ -60,7 +81,29 @@ exp:
 	| v = ID																{EVar v}
 	| e = exp; DOT; f = ID													{EDot (e, f)}
 	| f = exp; LPAREN; a = separated_list(COMMA, exp); RPAREN				{ECall (f, a)}
+	| o = unary_op; e = exp													{ECall (EDot (e, o), [])}
+	| e1 = exp; o = binary_op; e2 = exp										{match o with "::" -> ECall (EDot (e2, o), [e1]) | _ -> ECall (EDot (e1, o), [e2])}
 	| IF; c = exp; THEN; t = block; ELSE; e = block; END					{EIf (c, t, e)}
 	| LET; a = separated_list(COMMA, assign); IN; b = block; END			{ELet (a, b)}
 
 dict_entry: k = exp; COLON; v = exp	{(k, v)}
+
+%inline unary_op:
+	| NOT	{"not"}
+	| MINUS	{"-"}
+
+%inline binary_op:
+	| OR		{"or"}
+	| AND		{"and"}
+	| LT		{"<"}
+	| LE		{"<="}
+	| EQ		{"=="}
+	| NE		{"!="}
+	| GT		{">"}
+	| GE		{">="}
+	| CONS		{"::"}
+	| PLUS		{"+"}
+	| MINUS		{"-"}
+	| STAR		{"*"}
+	| SLASH		{"/"}
+	| PERCENT	{"%"}

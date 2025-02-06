@@ -7,7 +7,7 @@ let ws = [' ' '\t']+
 let digit = ['0'-'9']
 let frac = '.' digit*
 let exp = ['e' 'E'] ['-' '+']? digit+
-let number = digit+ frac? exp?
+let number = ['-' '+']? digit+ frac? exp?
 let id = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
 
 rule read =
@@ -41,6 +41,22 @@ rule read =
 	| "extends"	{EXTENDS}
 	| "uses"	{USES}
 	| "trait"	{TRAIT}
+	| "and"		{AND}
+	| "or"		{OR}
+	| "not"		{NOT}
+	| '+'		{PLUS}
+	| '-'		{MINUS}
+	| '*'		{STAR}
+	| '/'		{SLASH}
+	| '%'		{PERCENT}
+	| "<"		{LT}
+	| "<="		{LE}
+	| "=="		{EQ}
+	| "!="		{NE}
+	| ">"		{GT}
+	| ">="		{GE}
+	| '='		{EQUAL}
+	| "::"		{CONS}
 	| id		{ID (Lexing.lexeme lexbuf)}
 	| '#'		{skip_comment lexbuf}
 	| eof		{EOF}
