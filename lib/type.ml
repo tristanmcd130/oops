@@ -1,10 +1,11 @@
-type 'a type' = {traits: 'a trait list; fields: string list; methods: (string, 'a) Hashtbl.t}
-and 'a trait = {traits: 'a trait list; abs_methods: string list; methods: (string, 'a) Hashtbl.t}
-
 module type T = sig
-	type 'a t
-	val method_names: 'a t -> string list
-	val methods: 'a t -> (string, 'a) Hashtbl.t
+	type t
+	type value
+	type trait
+	val method_names: t -> string list (* just that specific type, not any of its traits *)
+	val methods: t -> (string, value) Hashtbl.t (* same here *)
+	val abs_methods: trait -> string list
+	val add_trait: t -> trait -> unit
 end
 
 let subset a b = List.for_all (fun x -> List.mem x b) a
@@ -17,9 +18,13 @@ module Make(T: T) = struct
 			match Hashtbl.find_opt (T.methods t) name with
 			| None -> get_method ts name
 			| m -> m
-	let impl trait type' methods =
-		Hashtbl.replace_seq (T.methods type') (methods |> List.to_seq);
+	let impl (trait: T.trait option) type' methods =
 		match trait with
-		| Some t -> if not (subset (T.method_names type') t.abs_methods) then failwith "Trait not implemented fully"
-		| None -> ()
+		| Some t ->
+			if subset (T.method_names type' @ List.map fst methods) (T.abs_methods t) then
+				T.add_trait type' t
+			else
+				failwith "Trait not implemented fully"
+		| None -> ();
+		Hashtbl.replace_seq (T.methods type') (methods |> List.to_seq)
 end

@@ -16,7 +16,7 @@ and trait
 val make_type: string list -> type'
 val make_trait: string list -> (string * t) list -> trait
 val dot: t -> string -> t
-val add_methods: type' -> (string * (t list -> t)) list -> unit
+val impl: t option -> t ->
 
 val null_type: type'
 val bool_type: type'

@@ -1,12 +1,14 @@
-type 'a type'
-and 'a trait
-
 module type T = sig
-	type 'a t
-	val method_names: 'a t -> string list
-	val methods: 'a t -> (string, 'a) Hashtbl.t
+	type t
+	type value
+	type trait
+	val method_names: t -> string list (* just that specific type, not any of its traits *)
+	val methods: t -> (string, value) Hashtbl.t (* same here *)
+	val abs_methods: trait -> string list
+	val add_trait: t -> trait -> unit
 end
 
 module Make: functor(T: T) -> sig
-	val impl: 'a trait option -> 'a T.t -> (string * 'a) list -> unit
+	val get_method: T.t list -> string -> T.value option
+	val impl: T.trait option -> T.t -> (string * T.value) list -> unit
 end

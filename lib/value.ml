@@ -1,7 +1,3 @@
-module StructType = Type.Make(struct
-  type t = Type.type'
-end)
-
 type t =
 | VNull
 | VBool of bool
@@ -14,8 +10,28 @@ type t =
 | VStruct of {type': type'; fields: (string, t) Hashtbl.t}
 | VType of type'
 | VTrait of trait
-and type' = {traits: trait list; fields: string list; methods: (string, t) Hashtbl.t}
-and trait = {traits: trait list; abs_methods: string list; methods: (string, t) Hashtbl.t}
+and type' = {mutable traits: trait list; fields: string list; methods: (string, t) Hashtbl.t}
+and trait = {mutable traits: trait list; abs_methods: string list; methods: (string, t) Hashtbl.t}
+
+module Struct = Type.Make(struct
+  type value = t
+  type t = type'
+  type nonrec trait = trait
+  let method_names type' = type'.methods |> Hashtbl.to_seq_keys |> List.of_seq
+  let methods type' = type'.methods
+  let abs_methods trait = trait.abs_methods
+  let add_trait type' trait = type'.traits <- trait :: type'.traits
+end)
+
+module Trait = Type.Make(struct
+  type value = t
+  type t = trait
+  type nonrec trait = trait
+  let method_names (trait: t) = trait.methods |> Hashtbl.to_seq_keys |> List.of_seq
+  let methods (trait: t) = trait.methods
+  let abs_methods (trait: trait) = trait.abs_methods
+  let add_trait (trait1: trait) (trait2: trait) = trait1.traits <- trait2 :: trait1.traits
+end)
 
 let null_type = {traits = []; fields = []; methods = Hashtbl.create 16}
 let bool_type = {traits = []; fields = []; methods = Hashtbl.create 16}
@@ -74,7 +90,7 @@ let get_method_names type' =
      (trait.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ List.concat_map get_method_names_from_trait trait.traits
   in (type'.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ List.concat_map get_method_names_from_trait type'.traits
 
-let impl trait type' methods =
+(* let impl trait type' methods =
   methods |> List.map (fun (n, v) -> (n, VPrimitive v)) |> List.to_seq |> Hashtbl.replace_seq type'.methods;
   (* match trait with
   | Some t -> List.map fst methods |>  *)
@@ -129,4 +145,4 @@ add_methods type_type [
 ];
 add_methods trait_type [
   ("to_string", fun _ -> VString "<trait>");
-];
+]; *)
