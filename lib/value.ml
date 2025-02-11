@@ -45,6 +45,12 @@ let trait_type = {traits = []; fields = []; methods = Hashtbl.create 16}
 
 let make_type fields = {traits = []; fields = fields; methods = Hashtbl.create 16}
 let make_trait abs_methods methods = {traits = []; abs_methods = abs_methods; methods = methods |> List.to_seq |> Hashtbl.of_seq}
+let to_type = function
+| VType t -> t
+| _ -> failwith "Not a type"
+let to_trait = function
+| VTrait t -> t
+| _ -> failwith "Not a trait"
 
 let type_of = function
 | VStruct {type' = t} -> t
@@ -89,6 +95,13 @@ let get_method_names type' =
   let rec get_method_names_from_trait (trait: trait) =
      (trait.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ List.concat_map get_method_names_from_trait trait.traits
   in (type'.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ List.concat_map get_method_names_from_trait type'.traits
+
+let impl trait type' methods =
+  let trait' = Option.bind trait (fun x -> Some (to_trait x)) in
+  match type' with
+  | VType t -> Struct.impl trait' t methods
+  | VTrait t -> Trait.impl trait' t methods
+  | _ -> failwith "Not a type"
 
 (* let impl trait type' methods =
   methods |> List.map (fun (n, v) -> (n, VPrimitive v)) |> List.to_seq |> Hashtbl.replace_seq type'.methods;

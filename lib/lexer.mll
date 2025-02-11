@@ -37,10 +37,10 @@ rule read =
 	| "in"		{IN}
 	| '='		{EQUAL}
 	| "def"		{DEF}
-	| "class"	{CLASS}
-	| "extends"	{EXTENDS}
-	| "uses"	{USES}
+	| "struct"	{STRUCT}
 	| "trait"	{TRAIT}
+	| "impl"	{IMPL}
+	| "for"		{FOR}
 	| "and"		{AND}
 	| "or"		{OR}
 	| "not"		{NOT}

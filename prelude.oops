@@ -1,1 +1,10 @@
 print("Welcome to oops")
+
+trait Iterator
+	get
+	next
+	done
+	def poo()
+		print("Hi")
+	end
+end
