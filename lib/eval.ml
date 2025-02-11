@@ -31,13 +31,13 @@ let rec eval (exp: Exp.t) env: Value.t =
     VNull
   | EClass (n, s, t, ms) ->
     Env.bind env n (VClass (Value.make_class
-      (match s with Some s' -> Some (eval s' env) | None -> None)
-      (match t with Some t' -> Some (eval t' env) | None -> None)
+      (Option.bind s (fun x -> Some (eval x env)))
+      (Option.bind t (fun x -> Some (eval x env)))
       (List.map (fun (n, ps, b) -> (n, Value.VFunction (ps, b, env))) ms)
     ));
     VNull
-  | ETrait (n, ams, ms) ->
-    Env.bind env n (VTrait (Value.make_trait ams (List.map (fun (n, ps, b) -> (n, Value.VFunction (ps, b, env))) ms)));
+  | ETrait (n, u, ams, ms) ->
+    Env.bind env n (VTrait (Value.make_trait (Option.bind u (fun x -> Some (eval x env))) ams (List.map (fun (n, ps, b) -> (n, Value.VFunction (ps, b, env))) ms)));
     VNull
 and call func args =
   match func with
@@ -52,5 +52,5 @@ let to_string obj =
   | _ -> failwith "Not a string";;
 
 Value.add_methods Value.class_class [("new", fun (Value.VClass self :: args) -> let obj = Value.VObject {class' = self; fields = Hashtbl.create 16} in call (Value.dot obj "init") args; obj)];
-Value.add_methods Value.list_class [("to_string", fun (Value.VList self :: _) -> Value.VString ("[" ^ String.concat ", " (List.map to_string self) ^ "]"))];
-Value.add_methods Value.dict_class [("to_string", fun (Value.VDict self :: _) -> Value.VString ("{" ^ String.concat ", " (self |> Hashtbl.to_seq |> List.of_seq |> List.map (fun (k, v) -> to_string k ^ ": " ^ to_string v)) ^ "}"))];
+Value.add_methods Value.list_class [("to_string", fun [Value.VList self] -> Value.VString ("[" ^ String.concat ", " (List.map to_string self) ^ "]"))];
+Value.add_methods Value.dict_class [("to_string", fun [Value.VDict self] -> Value.VString ("{" ^ String.concat ", " (self |> Hashtbl.to_seq |> List.of_seq |> List.map (fun (k, v) -> to_string k ^ ": " ^ to_string v)) ^ "}"))];

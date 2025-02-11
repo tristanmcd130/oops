@@ -14,7 +14,7 @@ and class'
 and trait
 
 val make_class: t option -> t option -> (string * t) list -> class'
-val make_trait: string list -> (string * t) list -> trait
+val make_trait: t option -> string list -> (string * t) list -> trait
 val dot: t -> string -> t
 val add_methods: class' -> (string * (t list -> t)) list -> unit
 

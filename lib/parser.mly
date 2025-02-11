@@ -59,7 +59,7 @@ stmt:
 	| o = exp; DOT; f = ID; EQUAL; v = exp						{EDotAssign (o, f, v)}
 	| d = def													{match d with (n, ps, b) -> EDef (n, ps, b)}
 	| CLASS; n = ID; e = extends?; u = uses?; ds = def*; END	{EClass (n, e, u, ds)}
-	| TRAIT; n = ID; ams = ID*; ms = def*; END					{Exp.ETrait (n, ams, ms)}
+	| TRAIT; n = ID; u = uses?; ams = ID*; ms = def*; END		{Exp.ETrait (n, u, ams, ms)}
 	| e = exp													{e}
 
 assign: n = ID; EQUAL; v = exp	{(n, v)}

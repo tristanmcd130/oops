@@ -25,20 +25,39 @@ let function_class = {super = Some object_class; trait = empty_trait; methods = 
 let class_class = {super = Some object_class; trait = empty_trait; methods = Hashtbl.create 16}
 let trait_class = {super = Some object_class; trait = empty_trait; methods = Hashtbl.create 16}
 
-let rec get_methods class' =
-  (class'.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ (class'.trait.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ (match class'.super with Some c -> get_methods c | None -> [])
+let override (trait1: trait) (trait2: trait) =
+  let new_methods = trait1.methods in
+  Hashtbl.replace_seq new_methods (trait2.methods |> Hashtbl.to_seq);
+  {abs_methods = trait1.abs_methods @ trait2.abs_methods; methods = new_methods}
+let symmetric_sum (trait1: trait) (trait2: trait) =
+  if List.exists (fun x -> Hashtbl.mem trait2.methods x) (trait1.methods |> Hashtbl.to_seq_keys |> List.of_seq) || List.exists (fun x -> Hashtbl.mem trait1.methods x) (trait2.methods |> Hashtbl.to_seq_keys |> List.of_seq) then
+    failwith "Cannot sum traits: methods overlap";
+  if List.exists (fun x -> List.mem x trait2.abs_methods) trait1.abs_methods || List.exists (fun x -> List.mem x trait1.abs_methods) trait2.abs_methods then
+    failwith "Cannot sum traits: abstract methods overlap";
+  override trait1 trait2
+let alias (trait: trait) name new_name =
+  let new_methods = trait.methods in
+  Hashtbl.replace new_methods new_name (Hashtbl.find new_methods name);
+  {abs_methods = trait.abs_methods; methods = new_methods}
+let exclude (trait1: trait) (trait2: trait) =
+  let new_methods = trait1.methods in
+  Hashtbl.filter_map_inplace (fun k v -> if List.mem k (trait2.methods |> Hashtbl.to_seq_keys |> List.of_seq) then None else Some v) new_methods;
+  {abs_methods = List.filter (fun x -> not (List.mem x trait2.abs_methods)) trait1.abs_methods; methods = new_methods}
+
+let rec get_method_names class' =
+  (class'.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ (class'.trait.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ (match class'.super with Some c -> get_method_names c | None -> [])
+let rec subset a b = List.for_all (fun x -> List.mem x b) a
 let uses_trait class' trait =
-  let rec subset a b = List.for_all (fun x -> List.mem x b) a in
-  subset trait.abs_methods (get_methods class')
+  subset trait.abs_methods (get_method_names class' @ (trait.methods |> Hashtbl.to_seq_keys |> List.of_seq))
 let make_class super trait methods =
   let c = {
     super = Some (match super with Some (VClass c) -> c | None -> object_class);
     trait = (match trait with Some (VTrait t) -> t | None -> empty_trait);
     methods = methods |> List.to_seq |> Hashtbl.of_seq
   } in match trait with
-  | Some (VTrait t) -> if uses_trait c t then c else failwith ("Class doesn't fully implement trait: " ^ String.concat ", " (List.filter (fun x -> not (List.mem x (get_methods c))) t.abs_methods))
+  | Some (VTrait t) -> if uses_trait c t then c else failwith "Class doesn't fully implement trait"
   | None -> c
-let make_trait abs_methods methods = {abs_methods = abs_methods; methods = methods |> List.to_seq |> Hashtbl.of_seq}
+let make_trait super abs_methods methods = symmetric_sum (match super with Some (VTrait t) -> t | None -> empty_trait) {abs_methods = abs_methods; methods = methods |> List.to_seq |> Hashtbl.of_seq}
 
 let class_of = function
 | VObject {class' = c} -> c
@@ -62,7 +81,7 @@ let bind_super class' = function
   | None -> e)
 | VPrimitive p -> VPrimitive p
 | _ -> failwith "Not a function"
-let rec get_method_from_class class' name = (* this function is pretty ridiculous *)
+let rec get_method_from_class class' name =
   match Hashtbl.find_opt class'.methods name with
   | Some m -> m |> bind_super class'.super
   | None ->
@@ -138,4 +157,8 @@ add_methods class_class [
 ];
 add_methods trait_class [
   ("to_string", fun _ -> VString "<trait>");
+  ("+", fun [VTrait self; VTrait other] -> VTrait (symmetric_sum self other));
+  ("override", fun [VTrait self; VTrait other] -> VTrait (override self other));
+  ("alias", fun [VTrait self; VString name; VString new_name] -> VTrait (alias self name new_name));
+  ("-", fun [VTrait self; VTrait other] -> VTrait (exclude self other));
 ];

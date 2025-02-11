@@ -16,4 +16,4 @@ type t =
 | EDotAssign of t * string * t
 | EDef of string * string list * t
 | EClass of string * t option * t option * (string * string list * t) list
-| ETrait of string * string list * (string * string list * t) list
+| ETrait of string * t option * string list * (string * string list * t) list

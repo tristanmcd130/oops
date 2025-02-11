@@ -1,5 +1,4 @@
 {
-	open Lexing
 	open Parser
 }
 
@@ -13,7 +12,7 @@ let id = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
 rule read =
 	parse
 	| ws		{read lexbuf}
-	| '\n'		{new_line lexbuf; read lexbuf}
+	| '\n'		{Lexing.new_line lexbuf; read lexbuf}
 	| "null"	{NULL}
 	| "true"	{BOOL true}
 	| "false"	{BOOL false}
@@ -72,6 +71,6 @@ and read_string buf =
 	| _				{failwith ("Illegal character in string: " ^ Lexing.lexeme lexbuf)}
 and skip_comment =
 	parse
-	| '\n'	{new_line lexbuf; read lexbuf}
+	| '\n'	{Lexing.new_line lexbuf; read lexbuf}
 	| eof	{EOF}
 	| _		{skip_comment lexbuf}
