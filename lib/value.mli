@@ -5,7 +5,7 @@ type t =
 | VString of string
 | VList of t list
 | VDict of (t, t) Hashtbl.t
-| VFunction of string list * Exp.t * t Env.t
+| VFunction of string * string list * Exp.t * t Env.t
 | VPrimitive of (t list -> t)
 | VObject of {class': class'; fields: (string, t) Hashtbl.t}
 | VClass of class'
@@ -13,8 +13,8 @@ type t =
 and class'
 and trait
 
-val make_class: t option -> t option -> (string * t) list -> class'
-val make_trait: t option -> string list -> (string * t) list -> trait
+val make_class: string -> t option -> t option -> (string * t) list -> t
+val make_trait: string -> t option -> string list -> (string * t) list -> t
 val dot: t -> string -> t
 val add_methods: class' -> (string * (t list -> t)) list -> unit
 

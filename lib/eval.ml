@@ -10,7 +10,7 @@ let rec eval (exp: Exp.t) env: Value.t =
   | EString s -> VString s
   | EList l -> VList (List.map (fun x -> eval x env) l)
   | EDict d -> VDict (List.map (fun (k, v) -> (eval k env, eval v env)) d |> List.to_seq |> Hashtbl.of_seq)
-  | EFun (ps, b) -> VFunction (ps, b, env)
+  | EFun (ps, b) -> VFunction ("anonymous", ps, b, env)
   | EVar v -> Env.lookup env v
   | EDot (o, f) -> Value.dot (eval o env) f
   | ECall (f, a) -> call (eval f env) (List.map (fun x -> eval x env) a)
@@ -27,21 +27,22 @@ let rec eval (exp: Exp.t) env: Value.t =
       VNull
     | _ -> failwith "Cannot assign to fields of primitive")
   | EDef (n, ps, b) ->
-    Env.bind env n (VFunction (ps, b, env));
+    Env.bind env n (VFunction (n, ps, b, env));
     VNull
   | EClass (n, s, t, ms) ->
-    Env.bind env n (VClass (Value.make_class
+    Env.bind env n (Value.make_class
+      n
       (Option.bind s (fun x -> Some (eval x env)))
       (Option.bind t (fun x -> Some (eval x env)))
-      (List.map (fun (n, ps, b) -> (n, Value.VFunction (ps, b, env))) ms)
-    ));
+      (List.map (fun (n', ps, b) -> (n', Value.VFunction (n ^ "." ^ n', ps, b, env))) ms)
+    );
     VNull
   | ETrait (n, u, ams, ms) ->
-    Env.bind env n (VTrait (Value.make_trait (Option.bind u (fun x -> Some (eval x env))) ams (List.map (fun (n, ps, b) -> (n, Value.VFunction (ps, b, env))) ms)));
+    Env.bind env n (Value.make_trait n (Option.bind u (fun x -> Some (eval x env))) ams (List.map (fun (n', ps, b) -> (n', Value.VFunction (n ^ "." ^ n', ps, b, env))) ms));
     VNull
 and call func args =
   match func with
-  | VFunction (ps, b, e) -> eval b (Env.create (List.combine ps args) (Some e))
+  | VFunction (_, ps, b, e) -> eval b (Env.create (List.combine ps args) (Some e))
   | VPrimitive p -> p args
   | VClass _ -> call (Value.dot func "new") args
   | _ -> failwith "Not a function"  
