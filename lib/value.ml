@@ -11,27 +11,7 @@ type t =
 | VType of type'
 | VTrait of trait
 and type' = {mutable traits: trait list; fields: string list; methods: (string, t) Hashtbl.t}
-and trait = {mutable traits: trait list; abs_methods: string list; methods: (string, t) Hashtbl.t}
-
-module Struct = Type.Make(struct
-  type value = t
-  type t = type'
-  type nonrec trait = trait
-  let method_names type' = type'.methods |> Hashtbl.to_seq_keys |> List.of_seq
-  let methods type' = type'.methods
-  let abs_methods trait = trait.abs_methods
-  let add_trait type' trait = type'.traits <- trait :: type'.traits
-end)
-
-module Trait = Type.Make(struct
-  type value = t
-  type t = trait
-  type nonrec trait = trait
-  let method_names (trait: t) = trait.methods |> Hashtbl.to_seq_keys |> List.of_seq
-  let methods (trait: t) = trait.methods
-  let abs_methods (trait: trait) = trait.abs_methods
-  let add_trait (trait1: trait) (trait2: trait) = trait1.traits <- trait2 :: trait1.traits
-end)
+and trait = {abs_methods: string list; methods: (string, t) Hashtbl.t}
 
 let null_type = {traits = []; fields = []; methods = Hashtbl.create 16}
 let bool_type = {traits = []; fields = []; methods = Hashtbl.create 16}
@@ -43,14 +23,9 @@ let function_type = {traits = []; fields = []; methods = Hashtbl.create 16}
 let type_type = {traits = []; fields = []; methods = Hashtbl.create 16}
 let trait_type = {traits = []; fields = []; methods = Hashtbl.create 16}
 
-let make_type fields = {traits = []; fields = fields; methods = Hashtbl.create 16}
-let make_trait abs_methods methods = {traits = []; abs_methods = abs_methods; methods = methods |> List.to_seq |> Hashtbl.of_seq}
-let to_type = function
-| VType t -> t
-| _ -> failwith "Not a type"
-let to_trait = function
-| VTrait t -> t
-| _ -> failwith "Not a trait"
+let make_type fields = VType {traits = []; fields = fields; methods = Hashtbl.create 16}
+let make_trait abs_methods methods = VTrait {abs_methods = abs_methods; methods = methods |> List.to_seq |> Hashtbl.of_seq}
+let make_struct type' args = VStruct {type' = type'; fields = List.combine type'.fields args |> List.to_seq |> Hashtbl.of_seq}
 
 let type_of = function
 | VStruct {type' = t} -> t
@@ -72,90 +47,89 @@ let rec get_method_from_traits (traits: trait list) name =
   | [] -> None
   | t :: ts ->
     match Hashtbl.find_opt t.methods name with
+    | Some m -> Some m
     | None -> get_method_from_traits ts name
-    | m -> m
-let rec get_method_from_type type' name =
+let get_method_from_type type' name =
   match Hashtbl.find_opt type'.methods name with
   | Some m -> m
   | None ->
     match get_method_from_traits type'.traits name with
     | Some m -> m
     | None -> failwith ("Method " ^ name ^ " not defined")
-let get_method obj name =
-  get_method_from_type (type_of obj) name |> bind_self obj
-let dot obj name =
-  match obj with
+let get_method value name = get_method_from_type (type_of value) name |> bind_self value
+let dot value name =
+  match value with
   | VStruct s ->
     (match Hashtbl.find_opt s.fields name with
     | Some f -> f
-    | None -> get_method obj name)
-  | _ -> get_method obj name
+    | None -> get_method value name)
+  | v -> get_method v name
 
-let get_method_names type' =
-  let rec get_method_names_from_trait (trait: trait) =
-     (trait.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ List.concat_map get_method_names_from_trait trait.traits
-  in (type'.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ List.concat_map get_method_names_from_trait type'.traits
+let subset a b = List.for_all (fun x -> List.mem x b) a
+let trait_method_names (trait: trait) = trait.methods |> Hashtbl.to_seq_keys |> List.of_seq
+let method_names type' =
+  (type'.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ List.concat_map trait_method_names type'.traits
+let impl trait (VType type') methods =
+  match trait with
+  | Some (VTrait t) ->
+    if subset t.abs_methods (method_names type' @ List.map fst methods) then
+      (type'.traits <- t :: type'.traits;
+      Hashtbl.replace_seq type'.methods (methods |> List.to_seq))
+    else
+      failwith ("Trait not implemented fully: " ^ String.concat ", " (List.filter (fun x -> not (List.mem x (method_names type' @ List.map fst methods))) t.abs_methods))
+  | None ->
+    Hashtbl.replace_seq type'.methods (methods |> List.to_seq);;
 
-let impl trait type' methods =
-  let trait' = Option.bind trait (fun x -> Some (to_trait x)) in
-  match type' with
-  | VType t -> Struct.impl trait' t methods
-  | VTrait t -> Trait.impl trait' t methods
-  | _ -> failwith "Not a type"
-
-(* let impl trait type' methods =
-  methods |> List.map (fun (n, v) -> (n, VPrimitive v)) |> List.to_seq |> Hashtbl.replace_seq type'.methods;
-  (* match trait with
-  | Some t -> List.map fst methods |>  *)
-let add_methods type' methods = methods |> List.map (fun (n, v) -> (n, VPrimitive v)) |> List.to_seq |> Hashtbl.replace_seq type'.methods;;
-add_methods null_type [
-  ("to_string", fun _ -> VString "null");
-  ("to_bool", fun _ -> VBool false);
+impl None (VType null_type) [
+  ("to_string", VPrimitive (fun _ -> VString "null"));
+  ("to_bool", VPrimitive (fun _ -> VBool false));
 ];
-add_methods bool_type [
-  ("to_string", fun [VBool self ] -> VString (string_of_bool self));
-  ("to_bool", fun [self] -> self);
-  ("and", fun [VBool self; VBool other] -> VBool (self && other));
-  ("or", fun [VBool self; VBool other] -> VBool (self || other));
-  ("not", fun [VBool self; VBool other] -> VBool (not self));
+impl None (VType bool_type) [
+  ("to_string", VPrimitive (fun [VBool self ] -> VString (string_of_bool self)));
+  ("to_bool", VPrimitive (fun [self] -> self));
+  ("and", VPrimitive (fun [VBool self; VBool other] -> VBool (self && other)));
+  ("or", VPrimitive (fun [VBool self; VBool other] -> VBool (self || other)));
+  ("not", VPrimitive (fun [VBool self; VBool other] -> VBool (not self)));
 ];
-add_methods number_type [
-  ("to_string", fun [VNumber self ] -> VString (string_of_float self));
-  ("to_bool", fun [VNumber self] -> VBool (self <> 0.0));
-  ("+", fun [VNumber self; VNumber other] -> VNumber (self +. other));
-  ("-", fun [VNumber self; VNumber other] -> VNumber (self -. other));
-  ("*", fun [VNumber self; VNumber other] -> VNumber (self *. other));
-  ("/", fun [VNumber self; VNumber other] -> VNumber (self /. other));
-  ("%", fun [VNumber self; VNumber other] -> VNumber (mod_float self other));
-  ("<", fun [VNumber self; VNumber other] -> VBool (self < other));
-  ("<=", fun [VNumber self; VNumber other] -> VBool (self <= other));
-  ("==", fun [VNumber self; VNumber other] -> VBool (self = other));
-  ("!=", fun [VNumber self; VNumber other] -> VBool (self <> other));
-  (">", fun [VNumber self; VNumber other] -> VBool (self > other));
-  (">=", fun [VNumber self; VNumber other] -> VBool (self >= other));
+impl None (VType number_type) [
+  ("to_string", VPrimitive (fun [VNumber self ] -> VString (string_of_float self)));
+  ("to_bool", VPrimitive (fun [VNumber self] -> VBool (self <> 0.0)));
+  ("+", VPrimitive (fun [VNumber self; VNumber other] -> VNumber (self +. other)));
+  ("-", VPrimitive (fun [VNumber self; VNumber other] -> VNumber (self -. other)));
+  ("*", VPrimitive (fun [VNumber self; VNumber other] -> VNumber (self *. other)));
+  ("/", VPrimitive (fun [VNumber self; VNumber other] -> VNumber (self /. other)));
+  ("%", VPrimitive (fun [VNumber self; VNumber other] -> VNumber (mod_float self other)));
+  ("<", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self < other)));
+  ("<=", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self <= other)));
+  ("==", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self = other)));
+  ("!=", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self <> other)));
+  (">", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self > other)));
+  (">=", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self >= other)));
 ];
-add_methods string_type [
-  ("to_string", fun [self] -> self);
-  ("to_bool", fun [VString self] -> VBool (self <> ""));
-  ("+", fun [VString self; VString other] -> VString (String.cat self other));
+impl None (VType string_type) [
+  ("to_string", VPrimitive (fun [self] -> self));
+  ("to_bool", VPrimitive (fun [VString self] -> VBool (self <> "")));
+  ("+", VPrimitive (fun [VString self; VString other] -> VString (String.cat self other)));
 ];
-add_methods list_type [
-  ("to_bool", fun [VList self] -> VBool (self <> []));
-  ("head", fun [VList self] ->  List.hd self);
-  ("tail", fun [VList self] ->  VList (List.tl self));
-  ("at", fun [VList self; VNumber index] -> List.nth self (int_of_float index));
-  ("+", fun [VList self; VList other] -> VList (self @ other));
+impl None (VType list_type) [
+  ("to_bool", VPrimitive (fun [VList self] -> VBool (self <> [])));
+  ("head", VPrimitive (fun [VList self] ->  List.hd self));
+  ("tail", VPrimitive (fun [VList self] ->  VList (List.tl self)));
+  ("length", VPrimitive (fun [VList self] ->  VNumber (List.length self |> float_of_int)));
+  ("at", VPrimitive (fun [VList self; VNumber index] -> List.nth self (int_of_float index)));
+  ("+", VPrimitive (fun [VList self; VList other] -> VList (self @ other)));
+  ("::", VPrimitive (fun [VList self; other] -> VList (other :: self)));
 ];
-add_methods dict_type [
-  ("to_bool", fun [VDict self] -> VBool (Hashtbl.length self > 0));
-  ("at", fun [VDict self; index] -> Hashtbl.find self index);
+impl None (VType dict_type) [
+  ("to_bool", VPrimitive (fun [VDict self] -> VBool (Hashtbl.length self > 0)));
+  ("at", VPrimitive (fun [VDict self; index] -> Hashtbl.find self index));
 ];
-add_methods function_type [
-  ("to_string", fun _ -> VString "<function>");
+impl None (VType function_type) [
+  ("to_string", VPrimitive (fun _ -> VString "<function>"));
 ];
-add_methods type_type [
-  ("to_string", fun _ -> VString "<type>");
+impl None (VType type_type) [
+  ("to_string", VPrimitive (fun _ -> VString "<type>"));
 ];
-add_methods trait_type [
-  ("to_string", fun _ -> VString "<trait>");
-]; *)
+impl None (VType trait_type) [
+  ("to_string", VPrimitive (fun _ -> VString "<trait>"));
+];

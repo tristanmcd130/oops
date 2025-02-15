@@ -4,7 +4,55 @@ trait Iterator
 	get
 	next
 	done
-	def poo()
-		print("Hi")
+	def for_each(f)
+		if self.done() then
+			null
+		else
+			f(self.get())
+			self.next().for_each(f)
+		end
+	end
+	def map(f)
+		struct MapIterator
+			iter
+		end
+		impl Iterator for MapIterator
+			def get()
+				f(self.iter.get())
+			end
+			def next()
+				MapIterator(self.iter.next())
+			end
+			def done()
+				self.iter.done()
+			end
+		end
+		MapIterator(self)
+	end
+	def fold(f, i)
+		if self.done() then
+			i
+		else
+			self.next().fold(f, f(i, self.get()))
+		end
+	end
+	def collect()
+		if self.done() then
+			[]
+		else
+			self.get() :: self.next().collect()
+		end
+	end
+end
+
+impl Iterator for List
+	def get()
+		self.head()
+	end
+	def next()
+		self.tail()
+	end
+	def done()
+		self.length() == 0
 	end
 end

@@ -30,10 +30,10 @@ let rec eval (exp: Exp.t) env: Value.t =
     Env.bind env n (VFunction (ps, b, env));
     VNull
   | EStruct (n, fs) ->
-    Env.bind env n (VType (Value.make_type fs));
+    Env.bind env n (Value.make_type fs);
     VNull
   | ETrait (n, ams, ms) ->
-    Env.bind env n (VTrait (Value.make_trait ams (List.map (fun (n, ps, b) -> (n, Value.VFunction (ps, b, env))) ms)));
+    Env.bind env n (Value.make_trait ams (List.map (fun (n, ps, b) -> (n, Value.VFunction (ps, b, env))) ms));
     VNull
   | EImpl (tr, ty, ms) ->
     let tr' = Option.bind tr (fun x -> Some (eval x env)) in
@@ -43,7 +43,7 @@ and call func args =
   match func with
   | VFunction (ps, b, e) -> eval b (Env.create (List.combine ps args) (Some e))
   | VPrimitive p -> p args
-  | VType t -> VStruct {type' = t; fields = List.combine t.fields args |> List.to_seq |> Hashtbl.of_seq}
+  | VType t -> Value.make_struct t args
   | _ -> failwith "Not a function"  
 
 let to_string obj =
@@ -51,6 +51,9 @@ let to_string obj =
   | VString s -> s
   | _ -> failwith "Not a string";;
 
-(* Value.add_methods Value.class_class [("new", fun (Value.VClass self :: args) -> let obj = Value.VObject {class' = self; fields = Hashtbl.create 16} in call (Value.dot obj "init") args; obj)];
-Value.add_methods Value.list_class [("to_string", fun (Value.VList self :: _) -> Value.VString ("[" ^ String.concat ", " (List.map to_string self) ^ "]"))];
-Value.add_methods Value.dict_class [("to_string", fun (Value.VDict self :: _) -> Value.VString ("{" ^ String.concat ", " (self |> Hashtbl.to_seq |> List.of_seq |> List.map (fun (k, v) -> to_string k ^ ": " ^ to_string v)) ^ "}"))]; *)
+Value.impl None (VType Value.list_type) [
+  ("to_string", VPrimitive (fun [VList self] -> VString ("[" ^ String.concat ", " (List.map to_string self) ^ "]")));
+];
+Value.impl None (VType Value.dict_type) [
+  ("to_string", VPrimitive (fun [VDict self] -> VString ("{" ^ String.concat ", " (Hashtbl.to_seq self |> List.of_seq |> List.map (fun (k, v) -> to_string k ^ ": " ^ to_string v)) ^ "}")));
+];
