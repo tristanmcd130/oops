@@ -17,6 +17,10 @@
 %token IF
 %token THEN
 %token ELSE
+%token COND
+%token BAR
+%token ARROW
+%token MATCH
 %token LET
 %token IN
 %token EQUAL
@@ -25,11 +29,15 @@
 %token TRAIT
 %token IMPL
 %token FOR
+%token MODULE
+%token EXPORTS
+%token IMPORT
 %token AND
 %token OR
 %token NOT
 %token PLUS
 %token MINUS
+%token UMINUS
 %token STAR
 %token SLASH
 %token PERCENT
@@ -55,18 +63,38 @@ prog: b = block; EOF	{b}
 block: ss = stmt*	{EBlock ss}
 
 stmt:
-	| a = assign									{match a with (n, v) -> EAssign (n, v)}
-	| o = exp; DOT; f = ID; EQUAL; v = exp			{EDotAssign (o, f, v)}
-	| d = def										{match d with (n, ps, b) -> EDef (n, ps, b)}
-	| STRUCT; n = ID; fs = ID*; END					{EStruct (n, fs)}
-	| TRAIT; n = ID; ams = ID*; ms = def*; END		{ETrait (n, ams, ms)}
-	| IMPL; n = exp; ms = def*; END					{EImpl (None, n, ms)}
-	| IMPL; t = exp; FOR; n = exp; ms = def*; END	{Exp.EImpl (Some t, n, ms)}
-	| e = exp										{e}
+	| a = assign																{match a with (n, v) -> EAssign (n, v)}
+	| o = exp; DOT; f = ID; EQUAL; v = exp										{EDotAssign (o, f, v)}
+	| d = def																	{match d with (n, ps, b) -> EDef (n, ps, b)}
+	| STRUCT; n = ID; fs = ID*; END												{EStruct (n, fs)}
+	| TRAIT; n = ID; ams = ID*; ms = def*; END									{ETrait (n, ams, ms)}
+	| IMPL; t = exp?; FOR; n = exp; ms = def*; END								{EImpl (t, n, ms)}
+	| MODULE; n = ID; EXPORTS; es = separated_list(COMMA, ID); b = block; END	{EModule (n, es, b)}
+	| IMPORT; f = STRING														{Exp.EImport f}
+	| e = exp																	{e}
 
 assign: n = ID; EQUAL; v = exp	{(n, v)}
 
-def: DEF; n = ID; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{(n, ps, b)}
+def: DEF; n = fun_id; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{(n, ps, b)}
+
+fun_id:
+	| NOT		{"not"}
+	| UMINUS	{"u-"}
+	| OR		{"or"}
+	| AND		{"and"}
+	| LT		{"<"}
+	| LE		{"<="}
+	| EQ		{"=="}
+	| NE		{"!="}
+	| GT		{">"}
+	| GE		{">="}
+	| CONS		{"::"}
+	| PLUS		{"+"}
+	| MINUS		{"-"}
+	| STAR		{"*"}
+	| SLASH		{"/"}
+	| PERCENT	{"%"}
+	| i = ID	{i}
 
 exp:
 	| NULL																	{ENull}
@@ -82,13 +110,16 @@ exp:
 	| o = unary_op; e = exp													{ECall (EDot (e, o), [])}
 	| e1 = exp; o = binary_op; e2 = exp										{match o with "::" -> ECall (EDot (e2, o), [e1]) | _ -> ECall (EDot (e1, o), [e2])}
 	| IF; c = exp; THEN; t = block; ELSE; e = block; END					{EIf (c, t, e)}
+	| COND; cs = case*; END													{ECond cs}
+	| MATCH; e = exp; cs = case*; END										{EMatch (e, cs)}
 	| LET; a = separated_list(COMMA, assign); IN; b = block; END			{ELet (a, b)}
+	| LPAREN; e = exp; RPAREN												{e}
 
 dict_entry: k = exp; COLON; v = exp	{(k, v)}
 
 %inline unary_op:
 	| NOT	{"not"}
-	| MINUS	{"-"}
+	| MINUS	{"u-"}
 
 %inline binary_op:
 	| OR		{"or"}
@@ -105,3 +136,5 @@ dict_entry: k = exp; COLON; v = exp	{(k, v)}
 	| STAR		{"*"}
 	| SLASH		{"/"}
 	| PERCENT	{"%"}
+
+case: BAR; t = exp; ARROW; b = block	{(t, b)}

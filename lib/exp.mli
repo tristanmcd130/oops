@@ -11,6 +11,8 @@ type t =
 | EDot of t * string
 | ECall of t * t list
 | EIf of t * t * t
+| ECond of (t * t) list
+| EMatch of t * (t * t) list
 | ELet of (string * t) list * t
 | EAssign of string * t
 | EDotAssign of t * string * t
@@ -18,3 +20,5 @@ type t =
 | EStruct of string * string list
 | ETrait of string * string list * (string * string list * t) list
 | EImpl of t option * t * (string * string list * t) list
+| EModule of string * string list * t
+| EImport of string

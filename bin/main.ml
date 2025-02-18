@@ -4,6 +4,10 @@ open Lexing
 let global_env = Env.create [
   ("print", Value.VPrimitive (fun [x] -> Eval.to_string x |> print_endline; VNull));
   ("List", VType Value.list_type);
+  ("String", VType Value.string_type);
+  ("Dict", VType Value.dict_type);
+  ("Module", VType Value.module_type);
+  ("sqrt", VPrimitive (fun [VNumber x] -> VNumber (sqrt x)));
 ] None
 
 let rec repl line_num =
@@ -15,11 +19,9 @@ let rec repl line_num =
   Env.bind global_env (Printf.sprintf "_%d" line_num) result |> ignore;
   repl (line_num + 1)
 
-let run_file filename = Eval.eval (In_channel.open_text filename |> from_channel |> Parser.prog Lexer.read) global_env |> ignore;;
-
 let () =
-  run_file "prelude.oops";
+  Eval.run_file "prelude.oops" global_env;
   match Sys.argv with
   | [|_|] -> repl 1
-  | [|_; f|] -> run_file f
+  | [|_; f|] -> Eval.run_file f global_env
   | _ -> print_endline ("Usage: " ^ Sys.argv.(0) ^ " [file]")

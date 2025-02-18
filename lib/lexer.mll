@@ -33,6 +33,10 @@ rule read =
 	| "if"		{IF}
 	| "then"	{THEN}
 	| "else"	{ELSE}
+	| "cond"	{COND}
+	| '|'		{BAR}
+	| "->"		{ARROW}
+	| "match"	{MATCH}
 	| "let"		{LET}
 	| "in"		{IN}
 	| '='		{EQUAL}
@@ -41,11 +45,15 @@ rule read =
 	| "trait"	{TRAIT}
 	| "impl"	{IMPL}
 	| "for"		{FOR}
+	| "module"	{MODULE}
+	| "exports"	{EXPORTS}
+	| "import"	{IMPORT}
 	| "and"		{AND}
 	| "or"		{OR}
 	| "not"		{NOT}
 	| '+'		{PLUS}
 	| '-'		{MINUS}
+	| "u-"		{UMINUS}
 	| '*'		{STAR}
 	| '/'		{SLASH}
 	| '%'		{PERCENT}

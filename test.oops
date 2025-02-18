@@ -1,0 +1,32 @@
+struct FibIterator
+	c
+	n
+end
+
+impl Iterator for FibIterator
+	def get()
+		self.c
+	end
+	def next()
+		FibIterator(self.n, self.c + self.n)
+	end
+	def done()
+		self.c > 4000000
+	end
+end
+
+print(FibIterator(1, 1).filter(fun(x) x % 2 == 0 end).fold(fun(x, y) x + y end, 0))
+
+module A exports a, b, c
+	a = 3
+	a = 2
+	b = 1
+	t = 2
+	g = 4
+	c = -9999
+end
+
+print(A.a)
+print(A.b)
+print(A.c)
+print(A)
