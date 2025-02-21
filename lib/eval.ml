@@ -18,9 +18,38 @@ let rec eval (exp: Exp.t) env: Value.t =
   | ECall (f, a) -> call (eval f env) (List.map (fun x -> eval x env) a)
   | EIf (c, t, e) -> eval (if eval c env = VBool true then t else e) env
   | ECond ((c, b) :: cs) -> eval (if eval c env = VBool true then b else ECond cs) env
-  | EMatch (e, (p, b) :: cs) -> VNull
-    (* (match match_with p (eval e env) with
-    | Some ) *)
+  | EMatch (e, (p, b) :: cs) ->
+    let rec match' pattern value =
+      (match (pattern, value) with
+      | (Exp.ENull, Value.VNull) -> Some []
+      | (EBool b, VBool b') when b = b' -> Some []
+      | (ENumber n, VNumber n') when n = n' -> Some []
+      | (EString s, VString s') when s = s' -> Some []
+      | (EList [], VList []) -> Some []
+      | (EList (p :: ps), VList (v :: vs)) ->
+        (match match' p v with
+        | Some bs ->
+          (match match' (EList ps) (VList vs) with
+          | Some bs' -> Some (bs @ bs')
+          | None -> None)
+        | None -> None)
+      | (EDict ((k, v) :: d), VDict d') when Hashtbl.mem d' (eval k env) -> 
+      | (EVar "_", _) -> Some []
+      | (EVar n, v) -> Some [(n, v)]
+      | (ECall (EDot (ps, "::"), [p]), VList (v :: vs)) ->
+        (match match' p v with
+        | Some bs ->
+          (match match' ps (VList vs) with
+          | Some bs' -> Some (bs @ bs')
+          | None -> None)
+        | None -> None)
+      | (ECall (EVar s, []), VStruct {type' = t; fields = fs}) when s = t.name && fs |> Hashtbl.to_seq |> List.of_seq = [] -> Some []
+      | (ECall (EVar s, p :: ps), VStruct {type' = t; fields = fs}) when s = t.name ->
+        (match p )
+      | _ -> None) in
+    (match match' p (eval e env) with
+    | Some bs -> eval b (Env.create bs (Some env))
+    | None -> eval (EMatch (e)) env)
   | ELet ([], b) -> eval b env
   | ELet ((n, v) :: ds, b) -> eval (ELet (ds, b)) (Env.create [(n, eval v env)] (Some env))
   | EAssign (n, v) ->
@@ -36,7 +65,7 @@ let rec eval (exp: Exp.t) env: Value.t =
     Env.bind env n (VFunction (n, ps, b, env));
     VNull
   | EStruct (n, fs) ->
-    Env.bind env n (Value.make_type n fs);
+    Env.bind env n (Value.make_type n fs (List.map (fun (n', ps, b) -> (n', Value.VFunction (n ^ "." ^ n', ps, b, env))) ms));
     VNull
   | ETrait (n, ams, ms) ->
     Env.bind env n (Value.make_trait n ams (List.map (fun (n', ps, b) -> (n', Value.VFunction (n ^ "." ^ n', ps, b, env))) ms));
@@ -65,7 +94,7 @@ and run_file filename env = eval (In_channel.open_text filename |> from_channel 
 let to_string obj =
   match call (Value.dot obj "to_string") [] with
   | VString s -> s
-  | _ -> failwith "Not a string";;
+  | _ -> failwith "Not a string"
 
 Value.impl None Value.list_type [
   ("to_string", VPrimitive (fun [VList self] -> VString ("[" ^ String.concat ", " (List.map to_string self) ^ "]")));

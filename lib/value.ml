@@ -24,7 +24,7 @@ let type_type = {name = "Type"; traits = []; fields = []; methods = Hashtbl.crea
 let trait_type = {name = "Trait"; traits = []; fields = []; methods = Hashtbl.create 16}
 let module_type = {name = "Module"; traits = []; fields = []; methods = Hashtbl.create 16}
 
-let make_type name fields = VType {name = name; traits = []; fields = fields; methods = Hashtbl.create 16}
+let make_type name fields methods = VType {name = name; traits = []; fields = fields; methods = methods |> List.to_seq |> Hashtbl.of_seq}
 let make_trait name abs_methods methods = VTrait {name = name; abs_methods = abs_methods; methods = methods |> List.to_seq |> Hashtbl.of_seq}
 let make_struct type' args = VStruct {type' = type'; fields = List.combine type'.fields args |> List.to_seq |> Hashtbl.of_seq}
 
@@ -134,17 +134,3 @@ impl None type_type [
 impl None trait_type [
   ("to_string", VPrimitive (fun [VTrait t] -> VString ("<trait " ^ t.name ^ ">")));
 ];;
-
-(* let rec match' pattern value =
-  match pattern with
-  | Exp.ENull -> if value = VNull then Some [] else None
-  | EBool b -> if value = VBool b then Some [] else None
-  | ENumber n -> if value = VNumber n then Some [] else None
-  | EString s -> if value = VString s then Some [] else None
-  | EVar "_" -> Some []
-  | EVar v -> Some [(v, value)]
-  | ECall (EDot (xs, "::"), [x]) -> Option.bind (match' x (List.hd value)) ()
-  | ECall (EVar f, a) ->
-    (match value with
-    | VStruct s -> if f = s.type'.name then Some (List.combine )
-    | _ -> None) *)

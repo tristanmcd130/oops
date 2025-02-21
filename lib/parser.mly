@@ -66,7 +66,7 @@ stmt:
 	| a = assign																{match a with (n, v) -> EAssign (n, v)}
 	| o = exp; DOT; f = ID; EQUAL; v = exp										{EDotAssign (o, f, v)}
 	| d = def																	{match d with (n, ps, b) -> EDef (n, ps, b)}
-	| STRUCT; n = ID; fs = ID*; END												{EStruct (n, fs)}
+	| STRUCT; n = ID; fs = ID*; ms = def*; END									{EStruct (n, fs, ms)}
 	| TRAIT; n = ID; ams = ID*; ms = def*; END									{ETrait (n, ams, ms)}
 	| IMPL; t = exp?; FOR; n = exp; ms = def*; END								{EImpl (t, n, ms)}
 	| MODULE; n = ID; EXPORTS; es = separated_list(COMMA, ID); b = block; END	{EModule (n, es, b)}

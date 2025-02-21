@@ -17,7 +17,7 @@ type t =
 | EAssign of string * t
 | EDotAssign of t * string * t
 | EDef of string * string list * t
-| EStruct of string * string list
+| EStruct of string * string list * (string * string list * t) list
 | ETrait of string * string list * (string * string list * t) list
 | EImpl of t option * t * (string * string list * t) list
 | EModule of string * string list * t
