@@ -13,7 +13,7 @@ type t =
 and type'
 and trait
 
-val make_type: string -> string list -> t
+val make_type: string -> string list -> (string * t) list -> t
 val make_trait: string -> string list -> (string * t) list -> t
 val make_struct: type' -> t list -> t
 val type_name: type' -> string
