@@ -113,13 +113,13 @@ impl Iterator for String
 	end
 end
 
-print("Welcome to oops")
-
 impl for Module
 	def to_string()
 		"<module " + self.__name + ">"
 	end
 end
+
+print("Welcome to oops")
 
 struct Complex
 	re
@@ -143,6 +143,6 @@ struct Complex
 		sqrt(self.re * self.re + self.im * self.im)
 	end
 	def to_string()
-		self.re.to_string() + " + " + self.im.to_string() + "i"
+		"{0} + {1}i".format([self.re, self.im])
 	end
 end

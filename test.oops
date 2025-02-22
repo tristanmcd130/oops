@@ -30,3 +30,59 @@ print(A.a)
 print(A.b)
 print(A.c)
 print(A)
+
+trait LinkedList
+	def head()
+		match self
+		| Cons(h, _) -> h
+		| Nil() -> null
+		end
+	end
+	def tail()
+		match self
+		| Cons(_, t) -> t
+		| Nil() -> null
+		end
+	end
+	def length()
+		match self
+		| Cons(h, t) -> 1 + t.length()
+		| Nil() -> 0
+		end
+	end
+	def ::(h)
+		Cons(h, self)
+	end
+	def to_string()
+		match self
+		| Cons(h, t) -> "Cons(" + h.to_string() + ", " + t.to_string() + ")"
+		| Nil() -> "Nil()"
+		end
+	end
+end
+
+struct Cons
+	h
+	t
+end
+impl LinkedList for Cons end
+
+struct Nil end
+impl LinkedList for Nil end
+
+a = 1 :: 2 :: 3 :: 4 :: Nil()
+print(a)
+print(a.length())
+
+def f(l)
+	match l
+	| (x and [k, v, c]) :: xs ->
+		print(x)
+		print(k)
+		print(v)
+		f(xs)
+	| [] -> print("done")
+	end
+end
+
+f([[1, 2], [3, 4], [5, 6]])

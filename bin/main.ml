@@ -7,6 +7,7 @@ let global_env = Env.create [
   ("String", VType Value.string_type);
   ("Dict", VType Value.dict_type);
   ("Module", VType Value.module_type);
+  ("Printable", VTrait Value.printable_trait);
   ("sqrt", VPrimitive (fun [VNumber x] -> VNumber (sqrt x)));
 ] None
 
