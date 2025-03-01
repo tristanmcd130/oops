@@ -23,6 +23,9 @@
 %token MATCH
 %token LET
 %token IN
+%token TRY
+%token CATCH
+%token THROW
 %token EQUAL
 %token DEF
 %token STRUCT
@@ -70,10 +73,11 @@ stmt:
 	| TRAIT; n = ID; ams = ID*; ms = def*; END									{ETrait (n, ams, ms)}
 	| IMPL; t = exp?; FOR; n = exp; ms = def*; END								{EImpl (t, n, ms)}
 	| MODULE; n = ID; EXPORTS; es = separated_list(COMMA, ID); b = block; END	{EModule (n, es, b)}
-	| IMPORT; f = STRING														{Exp.EImport f}
+	| IMPORT; f = STRING														{EImport f}
+	| THROW; e = exp															{Exp.EThrow e}
 	| e = exp																	{e}
 
-assign: n = ID; EQUAL; v = exp	{(n, v)}
+assign: p = exp; EQUAL; v = exp	{(p, v)}
 
 def: DEF; n = fun_id; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{(n, ps, b)}
 
@@ -113,6 +117,7 @@ exp:
 	| COND; cs = case*; END													{ECond cs}
 	| MATCH; e = exp; cs = case*; END										{EMatch (e, cs)}
 	| LET; a = separated_list(COMMA, assign); IN; b = block; END			{ELet (a, b)}
+	| TRY; b = block; CATCH; cs = case*; END								{ETry (b, cs)}
 	| LPAREN; e = exp; RPAREN												{e}
 
 dict_entry: k = exp; COLON; v = exp	{(k, v)}

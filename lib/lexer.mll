@@ -39,6 +39,9 @@ rule read =
 	| "match"	{MATCH}
 	| "let"		{LET}
 	| "in"		{IN}
+	| "try"		{TRY}
+	| "catch"	{CATCH}
+	| "throw"	{THROW}
 	| '='		{EQUAL}
 	| "def"		{DEF}
 	| "struct"	{STRUCT}

@@ -13,8 +13,10 @@ type t =
 | EIf of t * t * t
 | ECond of (t * t) list
 | EMatch of t * (t * t) list
-| ELet of (string * t) list * t
-| EAssign of string * t
+| ELet of (t * t) list * t
+| ETry of t * (t * t) list
+| EThrow of t
+| EAssign of t * t
 | EDotAssign of t * string * t
 | EDef of string * string list * t
 | EStruct of string * string list * (string * string list * t) list

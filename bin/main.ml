@@ -14,10 +14,13 @@ let global_env = Env.create [
 let rec repl line_num =
   Printf.printf "%d> " line_num;
   flush stdout;
-  let result = Eval.eval (from_channel stdin |> Parser.prog Lexer.read) global_env in
-  if result <> VNull then
-    Eval.to_string result |> print_endline;
-  Env.bind global_env (Printf.sprintf "_%d" line_num) result |> ignore;
+  try
+    let result = Eval.eval (from_channel stdin |> Parser.prog Lexer.read) global_env in
+    if result <> VNull then
+      Eval.to_string result |> print_endline;
+    Env.bind global_env ("_" ^ string_of_int line_num) result |> ignore
+  with
+  | Eval.Runtime_error e -> print_endline ("Uncaught error: " ^ Eval.to_string e);
   repl (line_num + 1)
 
 let () =

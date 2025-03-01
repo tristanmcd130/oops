@@ -1,5 +1,7 @@
 open Lexing
 
+exception Runtime_error of Value.t
+
 let rec eval (exp: Exp.t) env: Value.t =
   match exp with
   | EBlock [e] -> eval e env
@@ -21,12 +23,20 @@ let rec eval (exp: Exp.t) env: Value.t =
   | EMatch (e, cs) ->
     let v = eval e env in
     (match List.find_map (fun (p, b) -> Option.bind (match' p v) (fun e -> Some (eval b (Env.create e (Some env))))) cs with
-    | Some v -> v
+    | Some v' -> v'
     | None -> VNull)
   | ELet ([], b) -> eval b env
-  | ELet ((n, v) :: ds, b) -> eval (ELet (ds, b)) (Env.create [(n, eval v env)] (Some env))
-  | EAssign (n, v) ->
-    Env.bind env n (eval v env);
+  | ELet ((p, v) :: ds, b) -> eval (ELet (ds, b)) (Env.create (match' p (eval v env) |> Option.get) (Some env))
+  | ETry (b, cs) ->
+    (try
+      eval b env
+    with
+    | Runtime_error e -> (match List.find_map (fun (p, b) -> Option.bind (match' p e) (fun e' -> Some (eval b (Env.create e' (Some env))))) cs with
+      | Some v' -> v'
+      | None -> VNull))
+  | EThrow e -> raise (Runtime_error (eval e env))
+  | EAssign (p, v) ->
+    Env.bind_list env (match' p (eval v env) |> Option.get);
     VNull
   | EDotAssign (o, f, v) ->
     (match eval o env with
@@ -38,10 +48,10 @@ let rec eval (exp: Exp.t) env: Value.t =
     Env.bind env n (VFunction (n, ps, b, env));
     VNull
   | EStruct (n, fs, ms) ->
-    Env.bind env n (VType {name = n; traits = []; fields = fs; methods = List.map (fun (n', ps, b) -> (n', Value.VFunction (n ^ "." ^ n', ps, b, env))) ms |> List.to_seq |> Hashtbl.of_seq});
+    Env.bind env n (VType {name = n; traits = []; fields = fs; methods = ms |> List.map (fun (n', ps, b) -> (n', Value.VFunction (n ^ "." ^ n', ps, b, env))) |> List.to_seq |> Hashtbl.of_seq});
     VNull
   | ETrait (n, ams, ms) ->
-    Env.bind env n (VTrait {name = n; traits = []; abs_methods = ams; methods = List.map (fun (n', ps, b) -> (n', Value.VFunction (n ^ "." ^ n', ps, b, env))) ms |> List.to_seq |> Hashtbl.of_seq});
+    Env.bind env n (VTrait {name = n; traits = []; abs_methods = ams; methods = ms |> List.map (fun (n', ps, b) -> (n', Value.VFunction (n ^ "." ^ n', ps, b, env))) |> List.to_seq |> Hashtbl.of_seq});
     VNull
   | EImpl (tr, ty, ms) ->
     let tr' = Option.bind (Option.bind tr (fun x -> Some (eval x env))) (fun (VTrait x) -> Some x) in
@@ -62,7 +72,11 @@ and call func args =
   | VPrimitive p -> p args
   | VType t -> VStruct {type' = t; fields = List.combine t.fields args |> List.to_seq |> Hashtbl.of_seq}
   | _ -> failwith "Not a function"
-and run_file filename env = eval (In_channel.open_text filename |> from_channel |> Parser.prog Lexer.read) env |> ignore
+and run_file filename env =
+  try
+    eval (In_channel.open_text filename |> from_channel |> Parser.prog Lexer.read) env |> ignore
+  with
+  | Runtime_error e -> print_endline ("Uncaught error: " ^ to_string e)
 and match' pattern value =
   match (pattern, value) with
   | (Exp.ENull, Value.VNull) -> Some []
@@ -99,12 +113,12 @@ and match' pattern value =
       | Some bs' -> Some (bs' @ bs)
       | None -> None)
     | None -> None)
-  | _ -> None;;
-
-let to_string obj =
+  | _ -> None
+and to_string obj =
   match call (Value.dot obj "to_string") [] with
   | VString s -> s
   | _ -> failwith "Not a string";;
+
 let rec format string values =
   if String.length string = 0 then
     ""

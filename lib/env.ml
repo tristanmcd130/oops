@@ -9,3 +9,4 @@ let rec lookup env name =
     | Some p -> lookup p name
     | None -> failwith (name ^ " not found")
 let bind env name value = Hashtbl.replace env.bindings name value
+let bind_list env bindings = Hashtbl.replace_seq env.bindings (bindings |> List.to_seq)
