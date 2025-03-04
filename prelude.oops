@@ -40,39 +40,6 @@ trait Iterator
 			end
 		end
 	end
-	def _filter(f)
-		struct FilterIterator
-			iter
-		end
-		impl Iterator for FilterIterator
-			def get()
-				print("GET")
-				self.iter.get()
-			end
-			def next()
-				print("NEXT")
-				let n = self.iter.next() in
-					if f(n.get()) then
-						FilterIterator(n)
-					else
-						FilterIterator(n).next()
-					end
-				end
-			end
-			def done()
-				print("DONE")
-				self.iter.done()
-			end
-			def make_valid()
-				if self.iter.get() then
-					self
-				else
-					FilterIterator(self.iter.next())
-				end
-			end
-		end
-		FilterIterator(self).make_valid()
-	end
 	def fold(f, i)
 		if self.done() then
 			i
@@ -119,8 +86,6 @@ impl for Module
 	end
 end
 
-print("Welcome to oops")
-
 struct Complex
 	re
 	im
@@ -146,3 +111,5 @@ struct Complex
 		"{0} + {1}i".format([self.re, self.im])
 	end
 end
+
+print("Welcome to oops")

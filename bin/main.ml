@@ -9,18 +9,21 @@ let global_env = Env.create [
   ("Module", VType Value.module_type);
   ("Printable", VTrait Value.printable_trait);
   ("sqrt", VPrimitive (fun [VNumber x] -> VNumber (sqrt x)));
+  ("type", VPrimitive (fun [x] -> VType (Value.type_of x)));
 ] None
 
 let rec repl line_num =
   Printf.printf "%d> " line_num;
   flush stdout;
-  try
+  (try
     let result = Eval.eval (from_channel stdin |> Parser.prog Lexer.read) global_env in
     if result <> VNull then
       Eval.to_string result |> print_endline;
+    Env.bind global_env "_" result;
     Env.bind global_env ("_" ^ string_of_int line_num) result |> ignore
   with
-  | Eval.Runtime_error e -> print_endline ("Uncaught error: " ^ Eval.to_string e);
+  | Value.Runtime_error e -> print_endline ("Uncaught error: " ^ Eval.to_string e)
+  | e -> print_endline ("Uncaught primitive error: " ^ Printexc.to_string e));
   repl (line_num + 1)
 
 let () =

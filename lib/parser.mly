@@ -109,7 +109,7 @@ exp:
 	| LBRACE; es = separated_list(COMMA, dict_entry); RBRACE				{EDict es}
 	| FUN; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{EFun (ps, b)}
 	| v = ID																{EVar v}
-	| e = exp; DOT; f = ID													{EDot (e, f)}
+	| e = exp; DOT; f = fun_id												{EDot (e, f)}
 	| f = exp; LPAREN; a = separated_list(COMMA, exp); RPAREN				{ECall (f, a)}
 	| o = unary_op; e = exp													{ECall (EDot (e, o), [])}
 	| e1 = exp; o = binary_op; e2 = exp										{match o with "::" -> ECall (EDot (e2, o), [e1]) | _ -> ECall (EDot (e1, o), [e2])}

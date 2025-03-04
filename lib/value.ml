@@ -13,17 +13,29 @@ type t =
 and type' = {name: string; mutable traits: trait list; fields: string list; methods: (string, t) Hashtbl.t}
 and trait = {name: string; mutable traits: trait list; abs_methods: string list; methods: (string, t) Hashtbl.t}
 
-let null_type = {name = "Null"; traits = []; fields = []; methods = Hashtbl.create 16}
-let bool_type = {name = "Bool"; traits = []; fields = []; methods = Hashtbl.create 16}
-let number_type = {name = "Number"; traits = []; fields = []; methods = Hashtbl.create 16}
-let string_type = {name = "String"; traits = []; fields = []; methods = Hashtbl.create 16}
-let list_type = {name = "List"; traits = []; fields = []; methods = Hashtbl.create 16}
-let dict_type = {name = "Dict"; traits = []; fields = []; methods = Hashtbl.create 16}
-let function_type = {name = "Function"; traits = []; fields = []; methods = Hashtbl.create 16}
-let type_type = {name = "Type"; traits = []; fields = []; methods = Hashtbl.create 16}
-let trait_type = {name = "Trait"; traits = []; fields = []; methods = Hashtbl.create 16}
-let module_type = {name = "Module"; traits = []; fields = []; methods = Hashtbl.create 16}
+exception Runtime_error of t
+
+let base_trait = {name = "Base"; traits = []; abs_methods = []; methods = Hashtbl.create 16}
+let null_type = {name = "Null"; traits = [base_trait]; fields = []; methods = Hashtbl.create 16}
+let bool_type = {name = "Bool"; traits = [base_trait]; fields = []; methods = Hashtbl.create 16}
+let number_type = {name = "Number"; traits = [base_trait]; fields = []; methods = Hashtbl.create 16}
+let string_type = {name = "String"; traits = [base_trait]; fields = []; methods = Hashtbl.create 16}
+let list_type = {name = "List"; traits = [base_trait]; fields = []; methods = Hashtbl.create 16}
+let dict_type = {name = "Dict"; traits = [base_trait]; fields = []; methods = Hashtbl.create 16}
+let function_type = {name = "Function"; traits = [base_trait]; fields = []; methods = Hashtbl.create 16}
+let type_type = {name = "Type"; traits = [base_trait]; fields = []; methods = Hashtbl.create 16}
+let trait_type = {name = "Trait"; traits = [base_trait]; fields = []; methods = Hashtbl.create 16}
+let module_type = {name = "Module"; traits = [base_trait]; fields = []; methods = Hashtbl.create 16}
+let error_trait = {name = "Error"; traits = []; abs_methods = ["message"]; methods = Hashtbl.create 16}
+let field_undefined_error_type = {name = "FieldUndefinedError"; traits = [error_trait; base_trait]; fields = ["msg"]; methods = Hashtbl.create 16}
+let trait_not_implemented_error_type = {name = "TraitNotImplementedError"; traits = [error_trait; base_trait]; fields = ["msg"]; methods = Hashtbl.create 16}
+let variable_undefined_error_type = {name = "VariableUndefinedError"; traits = [error_trait; base_trait]; fields = ["msg"]; methods = Hashtbl.create 16}
 let printable_trait = {name = "Printable"; traits = []; abs_methods = ["to_string"]; methods = Hashtbl.create 16}
+
+let make_type name fields methods = VType {name = name; traits = [base_trait]; fields = fields; methods = methods |> List.to_seq |> Hashtbl.of_seq}
+let make_trait name abs_methods methods = VTrait {name = name; traits = []; abs_methods = abs_methods; methods = methods |> List.to_seq |> Hashtbl.of_seq}
+let make_struct type' args = VStruct {type' = type'; fields = List.combine type'.fields args |> List.to_seq |> Hashtbl.of_seq}
+let throw error_type msg = raise (Runtime_error (make_struct error_type [VString msg]))
 
 let type_name = function
 | VType t -> t.name
@@ -56,7 +68,7 @@ let get_method_from_type type' name =
   | None ->
     match get_method_from_traits type'.traits name with
     | Some m -> m
-    | None -> failwith (type'.name ^ " does not define method " ^ name)
+    | None -> throw field_undefined_error_type (type'.name ^ " does not define method " ^ name)
 let get_method value name = get_method_from_type (type_of value) name |> bind_self value
 let dot value name =
   match value with
@@ -85,7 +97,7 @@ let impl trait type' methods =
       (add_trait type' t;
       add_methods type' methods)
     else
-      failwith (type_name type' ^ " does not fully implement " ^ t.name ^ ": " ^ String.concat ", " (List.filter (fun x -> not (List.mem x (method_names type' @ List.map fst methods))) t.abs_methods))
+      throw trait_not_implemented_error_type (type_name type' ^ " does not fully implement " ^ t.name ^ ": " ^ String.concat ", " (List.filter (fun x -> not (List.mem x (method_names type' @ List.map fst methods))) t.abs_methods))
   | None -> add_methods type' methods;;
 
 impl (Some printable_trait) (VType null_type) [
@@ -108,7 +120,6 @@ impl None (VType number_type) [
   ("%", VPrimitive (fun [VNumber self; VNumber other] -> VNumber (mod_float self other)));
   ("<", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self < other)));
   ("<=", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self <= other)));
-  ("==", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self = other)));
   ("!=", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self <> other)));
   (">", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self > other)));
   (">=", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self >= other)));
@@ -146,4 +157,9 @@ impl (Some printable_trait) (VType type_type) [
 ];
 impl (Some printable_trait) (VType trait_type) [
   ("to_string", VPrimitive (fun [VTrait t] -> VString ("<trait " ^ t.name ^ ">")));
+];
+impl None (VTrait error_trait) [
+  ("to_string", VPrimitive (fun [VStruct self] ->
+    let (VString msg) = Hashtbl.find self.fields "msg" in
+    VString (self.type'.name ^ ": " ^ msg)));
 ];

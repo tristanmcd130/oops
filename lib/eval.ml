@@ -1,7 +1,5 @@
 open Lexing
 
-exception Runtime_error of Value.t
-
 let rec eval (exp: Exp.t) env: Value.t =
   match exp with
   | EBlock [e] -> eval e env
@@ -31,27 +29,30 @@ let rec eval (exp: Exp.t) env: Value.t =
     (try
       eval b env
     with
-    | Runtime_error e -> (match List.find_map (fun (p, b) -> Option.bind (match' p e) (fun e' -> Some (eval b (Env.create e' (Some env))))) cs with
+    | Value.Runtime_error e -> (match List.find_map (fun (p, b) -> Option.bind (match' p e) (fun e' -> Some (eval b (Env.create e' (Some env))))) cs with
       | Some v' -> v'
       | None -> VNull))
-  | EThrow e -> raise (Runtime_error (eval e env))
+  | EThrow e -> raise (Value.Runtime_error (eval e env))
   | EAssign (p, v) ->
     Env.bind_list env (match' p (eval v env) |> Option.get);
     VNull
   | EDotAssign (o, f, v) ->
     (match eval o env with
     | VStruct s ->
-      Hashtbl.replace s.fields f (eval v env);
+      (if Hashtbl.mem s.fields f then
+        Hashtbl.replace s.fields f (eval v env)
+      else
+        Value.throw Value.field_undefined_error_type (Value.type_name (VType s.type') ^ " does not have field " ^ f));
       VNull
-    | _ -> failwith "Cannot assign to fields of primitive")
+    | _ -> Value.throw Value.field_undefined_error_type "Primitive values have no fields")
   | EDef (n, ps, b) ->
     Env.bind env n (VFunction (n, ps, b, env));
     VNull
   | EStruct (n, fs, ms) ->
-    Env.bind env n (VType {name = n; traits = []; fields = fs; methods = ms |> List.map (fun (n', ps, b) -> (n', Value.VFunction (n ^ "." ^ n', ps, b, env))) |> List.to_seq |> Hashtbl.of_seq});
+    Env.bind env n (Value.make_type n fs (List.map (fun (n', ps, b) -> (n', Value.VFunction (n ^ "." ^ n', ps, b, env))) ms));
     VNull
   | ETrait (n, ams, ms) ->
-    Env.bind env n (VTrait {name = n; traits = []; abs_methods = ams; methods = ms |> List.map (fun (n', ps, b) -> (n', Value.VFunction (n ^ "." ^ n', ps, b, env))) |> List.to_seq |> Hashtbl.of_seq});
+    Env.bind env n (Value.make_trait n ams (List.map (fun (n', ps, b) -> (n', Value.VFunction (n ^ "." ^ n', ps, b, env))) ms));
     VNull
   | EImpl (tr, ty, ms) ->
     let tr' = Option.bind (Option.bind tr (fun x -> Some (eval x env))) (fun (VTrait x) -> Some x) in
@@ -70,13 +71,14 @@ and call func args =
   match func with
   | VFunction (_, ps, b, e) -> eval b (Env.create (List.combine ps args) (Some e))
   | VPrimitive p -> p args
-  | VType t -> VStruct {type' = t; fields = List.combine t.fields args |> List.to_seq |> Hashtbl.of_seq}
+  | VType t -> Value.make_struct t args
   | _ -> failwith "Not a function"
 and run_file filename env =
   try
     eval (In_channel.open_text filename |> from_channel |> Parser.prog Lexer.read) env |> ignore
   with
-  | Runtime_error e -> print_endline ("Uncaught error: " ^ to_string e)
+  | Value.Runtime_error e -> print_endline ("Uncaught error: " ^ to_string e)
+  | e -> print_endline ("Uncaught primitive error: " ^ Printexc.to_string e)
 and match' pattern value =
   match (pattern, value) with
   | (Exp.ENull, Value.VNull) -> Some []
@@ -132,6 +134,11 @@ let rec format string values =
       (List.nth values num |> to_string) ^ format (String.sub string (num_len + 2) (String.length string - num_len - 2)) values
     | x -> x ^ format (String.sub string 1 (String.length string - 1)) values;;
 
+Value.impl None (VTrait Value.base_trait) [
+  ("to_string", VPrimitive (fun [VStruct self] -> VString ((VType self.type' |> Value.type_name) ^ "(" ^ (self.fields |> Hashtbl.to_seq_values |> List.of_seq |> List.map to_string |> String.concat ", ") ^ ")")));
+  ("==", VPrimitive (fun [self; other] -> VBool (self = other)));
+  ("!=", VPrimitive (fun [self; other] -> VBool (self <> other)));
+];
 Value.impl None (VType Value.string_type) [
   ("format", VPrimitive (fun [VString self; VList args] -> VString (format self args)));
 ];
