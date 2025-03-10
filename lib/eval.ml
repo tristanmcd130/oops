@@ -48,16 +48,16 @@ let rec eval (exp: Exp.t) env: Value.t =
   | EDef (n, ps, b) ->
     Env.bind env n (VFunction (n, ps, b, env));
     VNull
-  | EStruct (n, fs, ms) ->
-    Env.bind env n (Value.make_type n fs (List.map (fun (n', ps, b) -> (n', Value.VFunction (n ^ "." ^ n', ps, b, env))) ms));
+  | EStruct (n, fs) ->
+    Env.bind env n (Value.make_type n fs);
     VNull
   | ETrait (n, ams, ms) ->
-    Env.bind env n (Value.make_trait n ams (List.map (fun (n', ps, b) -> (n', Value.VFunction (n ^ "." ^ n', ps, b, env))) ms));
+    Env.bind env n (Value.make_trait n ams (List.map (fun (n', ps, b) -> (n', Value.VFunction (n', ps, b, env))) ms));
     VNull
   | EImpl (tr, ty, ms) ->
     let tr' = Option.bind (Option.bind tr (fun x -> Some (eval x env))) (fun (VTrait x) -> Some x) in
-    let ty' = eval ty env in
-    Value.impl tr' ty' (List.map (fun (n, ps, b) -> (n, Value.VFunction (Value.type_name ty' ^ "." ^ n, ps, b, env))) ms);
+    let VType ty' = eval ty env in
+    Value.impl tr' ty' (List.map (fun (n, ps, b) -> (n, Value.VFunction (n, ps, b, env))) ms);
     VNull
   | EModule (n, es, b) ->
     let e = Env.create [] (Some env) in
@@ -134,17 +134,13 @@ let rec format string values =
       (List.nth values num |> to_string) ^ format (String.sub string (num_len + 2) (String.length string - num_len - 2)) values
     | x -> x ^ format (String.sub string 1 (String.length string - 1)) values;;
 
-Value.impl None (VTrait Value.base_trait) [
-  ("to_string", VPrimitive (fun [VStruct self] -> VString ((VType self.type' |> Value.type_name) ^ "(" ^ (self.fields |> Hashtbl.to_seq_values |> List.of_seq |> List.map to_string |> String.concat ", ") ^ ")")));
-  ("==", VPrimitive (fun [self; other] -> VBool (self = other)));
-  ("!=", VPrimitive (fun [self; other] -> VBool (self <> other)));
-];
-Value.impl None (VType Value.string_type) [
+
+Value.impl None Value.string_type [
   ("format", VPrimitive (fun [VString self; VList args] -> VString (format self args)));
 ];
-Value.impl (Some Value.printable_trait) (VType Value.list_type) [
+Value.impl (Some Value.printable_trait) Value.list_type [
   ("to_string", VPrimitive (fun [VList self] -> VString ("[" ^ String.concat ", " (List.map to_string self) ^ "]")));
 ];
-Value.impl (Some Value.printable_trait) (VType Value.dict_type) [
+Value.impl (Some Value.printable_trait) Value.dict_type [
   ("to_string", VPrimitive (fun [VDict self] -> VString ("{" ^ String.concat ", " (Hashtbl.to_seq self |> List.of_seq |> List.map (fun (k, v) -> to_string k ^ ": " ^ to_string v)) ^ "}")));
 ];

@@ -9,7 +9,6 @@ let global_env = Env.create [
   ("Module", VType Value.module_type);
   ("Printable", VTrait Value.printable_trait);
   ("sqrt", VPrimitive (fun [VNumber x] -> VNumber (sqrt x)));
-  ("type", VPrimitive (fun [x] -> VType (Value.type_of x)));
 ] None
 
 let rec repl line_num =
