@@ -33,16 +33,14 @@ let error_trait = {name = "Error"; abs_methods = ["message"]; methods = [
 let field_undefined_error_type = {name = "FieldUndefinedError"; traits = [error_trait]; fields = ["msg"]; methods = Hashtbl.create 16}
 let trait_not_implemented_error_type = {name = "TraitNotImplementedError"; traits = [error_trait]; fields = ["msg"]; methods = Hashtbl.create 16}
 let variable_undefined_error_type = {name = "VariableUndefinedError"; traits = [error_trait]; fields = ["msg"]; methods = Hashtbl.create 16}
-let printable_trait = {name = "Printable"; abs_methods = ["to_string"]; methods = Hashtbl.create 16}
+let printable_trait = {name = "Printable"; abs_methods = ["to_string"]; methods = Hashtbl.create 0}
+let equal_trait = {name = "Equal"; abs_methods = ["=="]; methods = [("!=", VFunction ("!=", ["other"], ECall(EDot (ECall (EDot (EVar "self", "=="), [EVar "other"]), "not"), []), Env.create [] None))] |> List.to_seq |> Hashtbl.of_seq}
 
 let make_type name fields = VType {name = name; traits = []; fields = fields; methods = Hashtbl.create 16}
 let make_trait name abs_methods methods = VTrait {name = name; abs_methods = abs_methods; methods = methods |> List.to_seq |> Hashtbl.of_seq}
 let make_struct type' args = VStruct {type' = type'; fields = List.combine type'.fields args |> List.to_seq |> Hashtbl.of_seq}
 let throw error_type msg = raise (Runtime_error (make_struct error_type [VString msg]))
 
-let type_name = function
-| VType t -> t.name
-| VTrait t-> t.name
 let type_of = function
 | VStruct {type' = t} -> t
 | VNull -> null_type
@@ -72,19 +70,65 @@ let get_method_from_type type' name =
     match get_method_from_traits type'.traits name with
     | Some m -> m
     | None -> throw field_undefined_error_type (type'.name ^ " does not define method " ^ name)
-let get_method value name = get_method_from_type (type_of value) name |> bind_self value
-let dot value name =
-  match value with
+let get_method obj name = get_method_from_type (type_of obj) name |> bind_self obj
+let dot obj name =
+  match obj with
   | VStruct s ->
     (match Hashtbl.find_opt s.fields name with
     | Some f -> f
-    | None -> get_method value name)
+    | None -> get_method obj name)
   | v -> get_method v name
+let dot_assign obj name value =
+  match obj with
+  | VStruct s ->
+    if Hashtbl.mem s.fields name then
+      throw field_undefined_error_type ((type_of obj).name ^ " does not define field " ^ name)
+    else
+      Hashtbl.replace s.fields name value
+  | _ -> throw field_undefined_error_type ((type_of obj).name ^ " is primitive and has no fields")
+
+let rec match' pattern value =
+  match (pattern, value) with
+  | (Exp.ENull, VNull) -> Some []
+  | (EBool b, VBool b') when b = b' -> Some []
+  | (ENumber n, VNumber n') when n = n' -> Some []
+  | (EString s, VString s') when s = s' -> Some []
+  | (EList [], VList []) -> Some []
+  | (EList (p :: ps), VList (v :: vs)) ->
+    (match match' p v with
+    | Some bs ->
+      (match match' (EList ps) (VList vs) with
+      | Some bs' -> Some (bs' @ bs)
+      | None -> None)
+    | None -> None)
+  (* TODO: add dict without eval *)
+  | (EVar "_", _) -> Some []
+  | (EVar n, v) -> Some [(n, v)]
+  | (ECall (EDot (ps, "::"), [p]), VList (v :: vs)) ->
+    (match match' p v with
+    | Some bs ->
+      (match match' ps (VList vs) with
+      | Some bs' -> Some (bs' @ bs)
+      | None -> None)
+    | None -> None)
+  | (ECall (EVar s, ps), VStruct {type' = t; fields = fs}) when s = t.name -> match' (EList ps) (VList (fs |> Hashtbl.to_seq_values |> List.of_seq))
+  | (ECall (EDot (p1, "or"), [p2]), v) ->
+    (match match' p1 v with
+    | Some bs -> Some bs
+    | None -> match' p2 v)
+  | (ECall (EDot (p1, "and"), [p2]), v) ->
+    (match match' p1 v with
+    | Some bs ->
+      (match match' p2 v with
+      | Some bs' -> Some (bs' @ bs)
+      | None -> None)
+    | None -> None)
+  | _ -> None
 
 let subset a b = List.for_all (fun x -> List.mem x b) a
 let method_names type' = (type'.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ (type'.traits |> List.map (fun (x: trait) -> x.methods |> Hashtbl.to_seq_keys |> List.of_seq) |> List.concat)
 let add_methods type' methods = methods |> List.to_seq |> Hashtbl.replace_seq type'.methods
-let impl (trait: trait option) (type': type') (methods: (string * t) list): unit =
+let impl trait type' methods =
   match trait with
   | Some t ->
     let ms = method_names type' @ List.map fst methods in
@@ -118,6 +162,9 @@ impl None number_type [
   ("!=", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self <> other)));
   (">", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self > other)));
   (">=", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self >= other)));
+];
+impl (Some equal_trait) number_type [
+  ("==", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self = other)));
 ];
 impl (Some printable_trait) number_type [
   ("to_string", VPrimitive (fun [VNumber self ] -> VString (Printf.sprintf "%g" self)));

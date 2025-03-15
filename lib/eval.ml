@@ -20,31 +20,25 @@ let rec eval (exp: Exp.t) env: Value.t =
   | ECond ((c, b) :: cs) -> eval (if eval c env = VBool true then b else ECond cs) env
   | EMatch (e, cs) ->
     let v = eval e env in
-    (match List.find_map (fun (p, b) -> Option.bind (match' p v) (fun e -> Some (eval b (Env.create e (Some env))))) cs with
+    (match List.find_map (fun (p, b) -> Option.bind (Value.match' p v) (fun e -> Some (eval b (Env.create e (Some env))))) cs with
     | Some v' -> v'
     | None -> VNull)
   | ELet ([], b) -> eval b env
-  | ELet ((p, v) :: ds, b) -> eval (ELet (ds, b)) (Env.create (match' p (eval v env) |> Option.get) (Some env))
+  | ELet ((p, v) :: ds, b) -> eval (ELet (ds, b)) (Env.create (Value.match' p (eval v env) |> Option.get) (Some env))
   | ETry (b, cs) ->
     (try
       eval b env
     with
-    | Value.Runtime_error e -> (match List.find_map (fun (p, b) -> Option.bind (match' p e) (fun e' -> Some (eval b (Env.create e' (Some env))))) cs with
+    | Value.Runtime_error e -> (match List.find_map (fun (p, b) -> Option.bind (Value.match' p e) (fun e' -> Some (eval b (Env.create e' (Some env))))) cs with
       | Some v' -> v'
       | None -> VNull))
   | EThrow e -> raise (Value.Runtime_error (eval e env))
   | EAssign (p, v) ->
-    Env.bind_list env (match' p (eval v env) |> Option.get);
+    Env.bind_list env (Value.match' p (eval v env) |> Option.get);
     VNull
   | EDotAssign (o, f, v) ->
-    (match eval o env with
-    | VStruct s ->
-      (if Hashtbl.mem s.fields f then
-        Hashtbl.replace s.fields f (eval v env)
-      else
-        Value.throw Value.field_undefined_error_type (Value.type_name (VType s.type') ^ " does not have field " ^ f));
-      VNull
-    | _ -> Value.throw Value.field_undefined_error_type "Primitive values have no fields")
+    Value.dot_assign (eval o env) f (eval v env);
+    VNull
   | EDef (n, ps, b) ->
     Env.bind env n (VFunction (n, ps, b, env));
     VNull
@@ -79,43 +73,6 @@ and run_file filename env =
   with
   | Value.Runtime_error e -> print_endline ("Uncaught error: " ^ to_string e)
   | e -> print_endline ("Uncaught primitive error: " ^ Printexc.to_string e)
-and match' pattern value =
-  match (pattern, value) with
-  | (Exp.ENull, Value.VNull) -> Some []
-  | (EBool b, VBool b') when b = b' -> Some []
-  | (ENumber n, VNumber n') when n = n' -> Some []
-  | (EString s, VString s') when s = s' -> Some []
-  | (EList [], VList []) -> Some []
-  | (EList (p :: ps), VList (v :: vs)) ->
-    (match match' p v with
-    | Some bs ->
-      (match match' (EList ps) (VList vs) with
-      | Some bs' -> Some (bs' @ bs)
-      | None -> None)
-    | None -> None)
-  (* TODO: add dict *)
-  | (EVar "_", _) -> Some []
-  | (EVar n, v) -> Some [(n, v)]
-  | (ECall (EDot (ps, "::"), [p]), VList (v :: vs)) ->
-    (match match' p v with
-    | Some bs ->
-      (match match' ps (VList vs) with
-      | Some bs' -> Some (bs' @ bs)
-      | None -> None)
-    | None -> None)
-  | (ECall (EVar s, ps), VStruct {type' = t; fields = fs}) when s = Value.type_name (VType t) -> match' (EList ps) (VList (fs |> Hashtbl.to_seq_values |> List.of_seq))
-  | (ECall (EDot (p1, "or"), [p2]), v) ->
-    (match match' p1 v with
-    | Some bs -> Some bs
-    | None -> match' p2 v)
-  | (ECall (EDot (p1, "and"), [p2]), v) ->
-    (match match' p1 v with
-    | Some bs ->
-      (match match' p2 v with
-      | Some bs' -> Some (bs' @ bs)
-      | None -> None)
-    | None -> None)
-  | _ -> None
 and to_string obj =
   match call (Value.dot obj "to_string") [] with
   | VString s -> s
