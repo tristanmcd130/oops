@@ -19,6 +19,7 @@ val throw: type' -> string -> 'a
 val make_type: string -> string list -> t
 val make_trait: string -> string list -> (string * t) list -> t
 val make_struct: type' -> t list -> t
+val type_name: t -> string
 val type_of: t -> type'
 val dot: t -> string -> t
 val match': Exp.t -> t -> (string * t) list option
@@ -34,6 +35,7 @@ val function_type: type'
 val type_type: type'
 val trait_type: type'
 val module_type: type'
+val base_trait: trait
 val printable_trait: trait
 val field_undefined_error_type: type'
 val trait_not_implemented_error_type: type'
