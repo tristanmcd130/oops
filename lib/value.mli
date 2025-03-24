@@ -7,7 +7,7 @@ type t =
 | VDict of (t, t) Hashtbl.t
 | VFunction of string * string list * Exp.t * t Env.t
 | VPrimitive of (t list -> t)
-| VStruct of {type': type'; fields: (string, t) Hashtbl.t}
+| VStruct of (type' * (string, t) Hashtbl.t)
 | VType of type'
 | VTrait of trait
 and type'
@@ -21,9 +21,8 @@ val make_trait: string -> string list -> (string * t) list -> t
 val make_struct: type' -> t list -> t
 val type_of: t -> type'
 val dot: t -> string -> t
-val dot_assign: t -> string -> t -> unit
 val match': Exp.t -> t -> (string * t) list option
-val impl: trait option -> type' -> (string * t) list -> unit
+val impl: trait option -> t -> (string * t) list -> unit
 
 val null_type: type'
 val bool_type: type'

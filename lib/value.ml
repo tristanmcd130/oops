@@ -7,7 +7,7 @@ type t =
 | VDict of (t, t) Hashtbl.t
 | VFunction of string * string list * Exp.t * t Env.t
 | VPrimitive of (t list -> t)
-| VStruct of {type': type'; fields: (string, t) Hashtbl.t}
+| VStruct of (type' * (string, t) Hashtbl.t)
 | VType of type'
 | VTrait of trait
 and type' = {name: string; mutable traits: trait list; fields: string list; methods: (string, t) Hashtbl.t}
@@ -36,13 +36,13 @@ let variable_undefined_error_type = {name = "VariableUndefinedError"; traits = [
 let printable_trait = {name = "Printable"; abs_methods = ["to_string"]; methods = Hashtbl.create 0}
 let equal_trait = {name = "Equal"; abs_methods = ["=="]; methods = [("!=", VFunction ("!=", ["other"], ECall(EDot (ECall (EDot (EVar "self", "=="), [EVar "other"]), "not"), []), Env.create [] None))] |> List.to_seq |> Hashtbl.of_seq}
 
-let make_type name fields = VType {name = name; traits = []; fields = fields; methods = Hashtbl.create 16}
-let make_trait name abs_methods methods = VTrait {name = name; abs_methods = abs_methods; methods = methods |> List.to_seq |> Hashtbl.of_seq}
-let make_struct type' args = VStruct {type' = type'; fields = List.combine type'.fields args |> List.to_seq |> Hashtbl.of_seq}
+let make_type name fields = VType {name = name; traits = [base_trait]; fields = fields; methods = Hashtbl.create 16}
+let make_trait name abs_methods methods = VTrait {name = name; traits = []; abs_methods = abs_methods; methods = methods |> List.to_seq |> Hashtbl.of_seq}
+let make_struct type' args = VStruct (type', List.combine type'.fields args |> List.to_seq |> Hashtbl.of_seq)
 let throw error_type msg = raise (Runtime_error (make_struct error_type [VString msg]))
 
 let type_of = function
-| VStruct {type' = t} -> t
+| VStruct (t, _) -> t
 | VNull -> null_type
 | VBool _ -> bool_type
 | VNumber _ -> number_type
@@ -70,22 +70,14 @@ let get_method_from_type type' name =
     match get_method_from_traits type'.traits name with
     | Some m -> m
     | None -> throw field_undefined_error_type (type'.name ^ " does not define method " ^ name)
-let get_method obj name = get_method_from_type (type_of obj) name |> bind_self obj
-let dot obj name =
-  match obj with
-  | VStruct s ->
-    (match Hashtbl.find_opt s.fields name with
+let get_method value name = get_method_from_type (type_of value) name |> bind_self value
+let dot value name =
+  match value with
+  | VStruct (_, fs) ->
+    (match Hashtbl.find_opt fs name with
     | Some f -> f
     | None -> get_method obj name)
   | v -> get_method v name
-let dot_assign obj name value =
-  match obj with
-  | VStruct s ->
-    if Hashtbl.mem s.fields name then
-      throw field_undefined_error_type ((type_of obj).name ^ " does not define field " ^ name)
-    else
-      Hashtbl.replace s.fields name value
-  | _ -> throw field_undefined_error_type ((type_of obj).name ^ " is primitive and has no fields")
 
 let rec match' pattern value =
   match (pattern, value) with
@@ -112,6 +104,82 @@ let rec match' pattern value =
       | None -> None)
     | None -> None)
   | (ECall (EVar s, ps), VStruct {type' = t; fields = fs}) when s = t.name -> match' (EList ps) (VList (fs |> Hashtbl.to_seq_values |> List.of_seq))
+  | (ECall (EDot (p1, "or"), [p2]), v) ->
+    (match match' p1 v with
+    | Some bs -> Some bs
+    | None -> match' p2 v)
+  | (ECall (EDot (p1, "and"), [p2]), v) ->
+    (match match' p1 v with
+    | Some bs ->
+      (match match' p2 v with
+      | Some bs' -> Some (bs' @ bs)
+      | None -> None)
+    | None -> None)
+  | _ -> None
+
+let rec match' pattern value =
+  match (pattern, value) with
+  | (Exp.ENull, VNull) -> Some []
+  | (EBool b, VBool b') when b = b' -> Some []
+  | (ENumber n, VNumber n') when n = n' -> Some []
+  | (EString s, VString s') when s = s' -> Some []
+  | (EList [], VList []) -> Some []
+  | (EList (p :: ps), VList (v :: vs)) ->
+    (match match' p v with
+    | Some bs ->
+      (match match' (EList ps) (VList vs) with
+      | Some bs' -> Some (bs' @ bs)
+      | None -> None)
+    | None -> None)
+  (* TODO: add dict *)
+  | (EVar "_", _) -> Some []
+  | (EVar n, v) -> Some [(n, v)]
+  | (ECall (EDot (ps, "::"), [p]), VList (v :: vs)) ->
+    (match match' p v with
+    | Some bs ->
+      (match match' ps (VList vs) with
+      | Some bs' -> Some (bs' @ bs)
+      | None -> None)
+    | None -> None)
+  | (ECall (EVar s, ps), VStruct (t, fs)) when s = t.name -> match' (EList ps) (VList (fs |> Hashtbl.to_seq_values |> List.of_seq))
+  | (ECall (EDot (p1, "or"), [p2]), v) ->
+    (match match' p1 v with
+    | Some bs -> Some bs
+    | None -> match' p2 v)
+  | (ECall (EDot (p1, "and"), [p2]), v) ->
+    (match match' p1 v with
+    | Some bs ->
+      (match match' p2 v with
+      | Some bs' -> Some (bs' @ bs)
+      | None -> None)
+    | None -> None)
+  | _ -> None
+
+let rec match' pattern value =
+  match (pattern, value) with
+  | (Exp.ENull, VNull) -> Some []
+  | (EBool b, VBool b') when b = b' -> Some []
+  | (ENumber n, VNumber n') when n = n' -> Some []
+  | (EString s, VString s') when s = s' -> Some []
+  | (EList [], VList []) -> Some []
+  | (EList (p :: ps), VList (v :: vs)) ->
+    (match match' p v with
+    | Some bs ->
+      (match match' (EList ps) (VList vs) with
+      | Some bs' -> Some (bs' @ bs)
+      | None -> None)
+    | None -> None)
+  (* TODO: add dict *)
+  | (EVar "_", _) -> Some []
+  | (EVar n, v) -> Some [(n, v)]
+  | (ECall (EDot (ps, "::"), [p]), VList (v :: vs)) ->
+    (match match' p v with
+    | Some bs ->
+      (match match' ps (VList vs) with
+      | Some bs' -> Some (bs' @ bs)
+      | None -> None)
+    | None -> None)
+  | (ECall (EVar s, ps), VStruct (t, fs)) when s = t.name -> match' (EList ps) (VList (fs |> Hashtbl.to_seq_values |> List.of_seq))
   | (ECall (EDot (p1, "or"), [p2]), v) ->
     (match match' p1 v with
     | Some bs -> Some bs
@@ -199,4 +267,9 @@ impl (Some printable_trait) type_type [
 ];
 impl (Some printable_trait) trait_type [
   ("to_string", VPrimitive (fun [VTrait t] -> VString ("<trait " ^ t.name ^ ">")));
+];
+impl (Some printable_trait) (VTrait error_trait) [
+  ("to_string", VPrimitive (fun [VStruct (t, fs)] ->
+    let (VString msg) = Hashtbl.find fs "msg" in
+    VString (t.name ^ ": " ^ msg)));
 ];

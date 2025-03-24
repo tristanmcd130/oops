@@ -31,7 +31,12 @@ print(A.b)
 print(A.c)
 print(A)
 
-throw FibIterator(1, 1)
+try
+	throw FibIterator(1, 1)
+catch
+| FibIterator(x, y) -> print("Caught {0} and {1}".format([x, y]))
+| _ -> print("something else idk")
+end
 
 trait LinkedList
 	def head()

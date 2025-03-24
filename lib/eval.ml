@@ -37,8 +37,14 @@ let rec eval (exp: Exp.t) env: Value.t =
     Env.bind_list env (Value.match' p (eval v env) |> Option.get);
     VNull
   | EDotAssign (o, f, v) ->
-    Value.dot_assign (eval o env) f (eval v env);
-    VNull
+    (match eval o env with
+    | VStruct (t, fs) ->
+      (if Hashtbl.mem fs f then
+        Hashtbl.replace fs f (eval v env)
+      else
+        Value.throw Value.field_undefined_error_type (Value.type_name (VType t) ^ " does not have field " ^ f));
+      VNull
+    | _ -> Value.throw Value.field_undefined_error_type "Primitive values have no fields")
   | EDef (n, ps, b) ->
     Env.bind env n (VFunction (n, ps, b, env));
     VNull
@@ -56,7 +62,7 @@ let rec eval (exp: Exp.t) env: Value.t =
   | EModule (n, es, b) ->
     let e = Env.create [] (Some env) in
     eval b e;
-    Env.bind env n (VStruct {type' = Value.module_type; fields = (List.map (fun x -> (x, Env.lookup e x)) es @ [("__name", VString n)]) |> List.to_seq |> Hashtbl.of_seq});
+    Env.bind env n (VStruct (Value.module_type, (List.map (fun x -> (x, Env.lookup e x)) es @ [("__name", VString n)]) |> List.to_seq |> Hashtbl.of_seq));
     VNull
   | EImport f ->
     run_file f env;
@@ -91,8 +97,12 @@ let rec format string values =
       (List.nth values num |> to_string) ^ format (String.sub string (num_len + 2) (String.length string - num_len - 2)) values
     | x -> x ^ format (String.sub string 1 (String.length string - 1)) values;;
 
-
-Value.impl None Value.string_type [
+Value.impl (Some Value.printable_trait) (VTrait Value.base_trait) [
+  ("to_string", VPrimitive (fun [VStruct (t, fs)] -> VString ((VType t |> Value.type_name) ^ "(" ^ (fs |> Hashtbl.to_seq_values |> List.of_seq |> List.map to_string |> String.concat ", ") ^ ")")));
+  ("==", VPrimitive (fun [self; other] -> VBool (self = other)));
+  ("!=", VPrimitive (fun [self; other] -> VBool (self <> other)));
+];
+Value.impl None (VType Value.string_type) [
   ("format", VPrimitive (fun [VString self; VList args] -> VString (format self args)));
 ];
 Value.impl (Some Value.printable_trait) Value.list_type [
