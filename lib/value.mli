@@ -7,7 +7,7 @@ type t =
 | VDict of (t, t) Hashtbl.t
 | VFunction of string * string list * Exp.t * t Env.t
 | VPrimitive of (t list -> t)
-| VStruct of {type': type'; fields: (string, t) Hashtbl.t}
+| VStruct of (type' * (string, t) Hashtbl.t)
 | VType of type'
 | VTrait of trait
 and type'
@@ -16,12 +16,13 @@ and trait
 exception Runtime_error of t
 val throw: type' -> string -> 'a
 
-val make_type: string -> string list -> (string * t) list -> t
+val make_type: string -> string list -> t
 val make_trait: string -> string list -> (string * t) list -> t
 val make_struct: type' -> t list -> t
 val type_name: t -> string
 val type_of: t -> type'
 val dot: t -> string -> t
+val match': Exp.t -> t -> (string * t) list option
 val impl: trait option -> t -> (string * t) list -> unit
 
 val null_type: type'

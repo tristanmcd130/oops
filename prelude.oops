@@ -89,6 +89,8 @@ end
 struct Complex
 	re
 	im
+end
+impl for Complex
 	def +(other)
 		Complex(self.re + other.re, self.im + other.im)
 	end
