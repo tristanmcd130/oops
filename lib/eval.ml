@@ -98,7 +98,7 @@ let rec format string values =
     | x -> x ^ format (String.sub string 1 (String.length string - 1)) values;;
 
 Value.impl (Some Value.printable_trait) (VTrait Value.base_trait) [
-  ("to_string", VPrimitive (fun [VStruct (t, fs)] -> VString ((VType t |> Value.type_name) ^ "(" ^ (fs |> Hashtbl.to_seq_values |> List.of_seq |> List.map to_string |> String.concat ", ") ^ ")")));
+  ("to_string", VPrimitive (fun [VStruct (t, fs)] -> VString ((VType t |> Value.type_name) ^ "(" ^ (List.map (Hashtbl.find fs) (Value.fields t) |> List.map to_string |> String.concat ", ") ^ ")")));
   ("==", VPrimitive (fun [self; other] -> VBool (self = other)));
   ("!=", VPrimitive (fun [self; other] -> VBool (self <> other)));
 ];

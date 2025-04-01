@@ -19,6 +19,7 @@ val throw: type' -> string -> 'a
 val make_type: string -> string list -> t
 val make_trait: string -> string list -> (string * t) list -> t
 val make_struct: type' -> t list -> t
+val fields: type' -> string list
 val type_name: t -> string
 val type_of: t -> type'
 val dot: t -> string -> t

@@ -1,0 +1,54 @@
+trait AVLTree
+	def insert(value)
+		match self
+		| Nil() -> Node(Nil(), value, Nil())
+		| Node(l, v, r) ->
+			if value <= v then
+				Node(l.insert(value), v, r)
+			else
+				Node(l, v, r.insert(value))
+			end.fix()
+		end
+	end
+	def fix()
+		if let b = self.balance() in b > 1 or b < -1 end then
+			match self
+			| Node(a_, a, Node(b_, b, Node(c_, c, d_))) -> Node(Node(a_, a, b_), b, Node(c_, c, d_))
+			| Node(Node(Node(c_, c, d_), b, b_), a, a_) -> Node(Node(c_, c, d_), b, Node(b_, a, a_))
+			| Node(a_, a, Node(Node(c_, c, d_), b, b_)) -> Node(Node(a_, a, c_), c, Node(d_, b, b_))
+			| Node(Node(b_, b, Node(c_, c, d_)), a, a_) -> Node(Node(b_, b, c_), c, Node(d_, a, a_))
+			end
+		else
+			self
+		end
+	end
+	def height()
+		match self
+		| Nil() -> 0
+		| Node(l, v, r) -> max(l.height(), r.height()) + 1
+		end
+	end
+	def balance()
+		self.right.height() - self.left.height()
+	end
+end
+impl Printable for AVLTree
+	def to_string()
+		match self
+		| Nil() -> ""
+		| Node(l, v, r) -> "[{0} {1} {2}]".format([l, v, r])
+		end
+	end
+end
+
+struct Node
+	left
+	value
+	right
+end
+impl AVLTree for Node end
+
+struct Nil end
+impl AVLTree for Nil end
+
+print(Range(1, 100).fold(fun(x, y) x.insert(y) end, Nil()))

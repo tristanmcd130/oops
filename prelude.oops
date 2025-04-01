@@ -114,4 +114,23 @@ impl for Complex
 	end
 end
 
+struct Range
+	start
+	stop
+end
+impl Iterator for Range
+	def get()
+		self.start
+	end
+	def next()
+		Range(self.start + 1, self.stop)
+	end
+	def done()
+		self.start > self.stop
+	end
+	def to_string()
+		"{0}..{1}".format([self.start, self.stop])
+	end
+end
+
 print("Welcome to oops")

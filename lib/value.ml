@@ -37,6 +37,7 @@ let make_trait name abs_methods methods = VTrait {name = name; traits = []; abs_
 let make_struct type' args = VStruct (type', List.combine type'.fields args |> List.to_seq |> Hashtbl.of_seq)
 let throw error_type msg = raise (Runtime_error (make_struct error_type [VString msg]))
 
+let fields type' = type'.fields
 let type_name = function
 | VType t -> t.name
 | VTrait t-> t.name
@@ -102,7 +103,7 @@ let rec match' pattern value =
       | Some bs' -> Some (bs' @ bs)
       | None -> None)
     | None -> None)
-  | (ECall (EVar s, ps), VStruct (t, fs)) when s = t.name -> match' (EList ps) (VList (fs |> Hashtbl.to_seq_values |> List.of_seq))
+  | (ECall (EVar s, ps), VStruct (t, fs)) when s = t.name -> match' (EList ps) (VList (List.map (Hashtbl.find fs) t.fields))
   | (ECall (EDot (p1, "or"), [p2]), v) ->
     (match match' p1 v with
     | Some bs -> Some bs
