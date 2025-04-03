@@ -109,6 +109,8 @@ impl for Complex
 	def abs()
 		sqrt(self.re * self.re + self.im * self.im)
 	end
+end
+impl Printable for Complex
 	def to_string()
 		"{0} + {1}i".format([self.re, self.im])
 	end

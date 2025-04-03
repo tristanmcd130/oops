@@ -79,6 +79,13 @@ let dot value name =
     | None -> get_method value name)
   | v -> get_method v name
 
+let rec make_literal = function
+| Exp.EBool b -> VBool b
+| ENumber n -> VNumber n
+| EString s -> VString s
+| EList l -> VList (List.map make_literal l)
+| EDict d -> VDict (List.map (fun (k, v) -> (make_literal k, make_literal v)) d |> List.to_seq |> Hashtbl.of_seq)
+| _ -> failwith "match fails on dicts containing non-literals"
 let rec match' pattern value =
   match (pattern, value) with
   | (Exp.ENull, VNull) -> Some []
@@ -93,7 +100,17 @@ let rec match' pattern value =
       | Some bs' -> Some (bs' @ bs)
       | None -> None)
     | None -> None)
-  (* TODO: add dict *)
+  | (EDict [], _) -> Some []
+  | (EDict ((k, v) :: d), VDict d') ->
+    (match Hashtbl.find_opt d' (make_literal k) with
+    | Some v' ->
+      (match match' v v' with
+      | Some bs ->
+        (match match' (EDict d) (VDict d') with
+        | Some bs' -> Some (bs' @ bs)
+        | None -> None)
+      | None -> None)
+    | None -> None)
   | (EVar "_", _) -> Some []
   | (EVar n, v) -> Some [(n, v)]
   | (ECall (EDot (ps, "::"), [p]), VList (v :: vs)) ->

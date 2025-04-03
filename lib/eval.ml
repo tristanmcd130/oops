@@ -34,7 +34,7 @@ let rec eval (exp: Exp.t) env: Value.t =
       | None -> VNull))
   | EThrow e -> raise (Value.Runtime_error (eval e env))
   | EAssign (p, v) ->
-    Env.bind_list env (Value.match' p (eval v env) |> Option.get);
+    Env.bind_list env (Value.match' p (eval v env) |> Option.value ~default: []);
     VNull
   | EDotAssign (o, f, v) ->
     (match eval o env with
