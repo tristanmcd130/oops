@@ -49,10 +49,10 @@ let rec eval (exp: Exp.t) env: Value.t =
     Env.bind env n (VFunction (n, ps, b, env));
     VNull
   | EStruct (n, fs) ->
-    Env.bind env n (Value.make_type n fs);
+    Env.bind env n (VType (Value.make_type n fs));
     VNull
   | ETrait (n, ams, ms) ->
-    Env.bind env n (Value.make_trait n ams (List.map (fun (n', ps, b) -> (n', Value.VFunction (n ^ "." ^ n', ps, b, env))) ms));
+    Env.bind env n (VTrait (Value.make_trait n ams (List.map (fun (n', ps, b) -> (n', Value.VFunction (n ^ "." ^ n', ps, b, env))) ms)));
     VNull
   | EImpl (tr, ty, ms) ->
     let tr' = Option.bind (Option.bind tr (fun x -> Some (eval x env))) (fun (VTrait x) -> Some x) in

@@ -63,7 +63,10 @@
 
 prog: b = block; EOF	{b}
 
-block: ss = stmt*	{EBlock ss}
+block:
+	|						{EBlock []}
+	| s = stmt				{s}
+	| s = stmt; ss = stmt+	{EBlock (s :: ss)}
 
 stmt:
 	| a = assign																{match a with (n, v) -> EAssign (n, v)}

@@ -32,8 +32,8 @@ let trait_not_implemented_error_type = {name = "TraitNotImplementedError"; trait
 let variable_undefined_error_type = {name = "VariableUndefinedError"; traits = [error_trait; base_trait]; fields = ["msg"]; methods = Hashtbl.create 16}
 let printable_trait = {name = "Printable"; traits = []; abs_methods = ["to_string"]; methods = Hashtbl.create 16}
 
-let make_type name fields = VType {name = name; traits = [base_trait]; fields = fields; methods = Hashtbl.create 16}
-let make_trait name abs_methods methods = VTrait {name = name; traits = []; abs_methods = abs_methods; methods = methods |> List.to_seq |> Hashtbl.of_seq}
+let make_type name fields = {name = name; traits = [base_trait]; fields = fields; methods = Hashtbl.create 16}
+let make_trait name abs_methods methods = {name = name; traits = []; abs_methods = abs_methods; methods = methods |> List.to_seq |> Hashtbl.of_seq}
 let make_struct type' args = VStruct (type', List.combine type'.fields args |> List.to_seq |> Hashtbl.of_seq)
 let throw error_type msg = raise (Runtime_error (make_struct error_type [VString msg]))
 
@@ -162,7 +162,7 @@ impl (Some printable_trait) (VType null_type) [
 impl None (VType bool_type) [
   ("and", VPrimitive (fun [VBool self; VBool other] -> VBool (self && other)));
   ("or", VPrimitive (fun [VBool self; VBool other] -> VBool (self || other)));
-  ("not", VPrimitive (fun [VBool self; VBool other] -> VBool (not self)));
+  ("not", VPrimitive (fun [VBool self] -> VBool (not self)));
 ];
 impl (Some printable_trait) (VType bool_type) [
   ("to_string", VPrimitive (fun [VBool self ] -> VString (string_of_bool self)));

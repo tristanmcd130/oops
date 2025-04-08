@@ -16,8 +16,8 @@ and trait
 exception Runtime_error of t
 val throw: type' -> string -> 'a
 
-val make_type: string -> string list -> t
-val make_trait: string -> string list -> (string * t) list -> t
+val make_type: string -> string list -> type'
+val make_trait: string -> string list -> (string * t) list -> trait
 val make_struct: type' -> t list -> t
 val fields: type' -> string list
 val type_name: t -> string

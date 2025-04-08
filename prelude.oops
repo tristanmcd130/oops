@@ -130,6 +130,8 @@ impl Iterator for Range
 	def done()
 		self.start > self.stop
 	end
+end
+impl Printable for Range
 	def to_string()
 		"{0}..{1}".format([self.start, self.stop])
 	end
