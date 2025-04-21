@@ -11,21 +11,11 @@ trait Iterator
 		end
 	end
 	def map(f)
-		struct MapIterator
-			iter
+		if self.done() then
+			[]
+		else
+			f(self.get()) :: self.next().map(f)
 		end
-		impl Iterator for MapIterator
-			def get()
-				f(self.iter.get())
-			end
-			def next()
-				MapIterator(self.iter.next())
-			end
-			def done()
-				self.iter.done()
-			end
-		end
-		MapIterator(self)
 	end
 	def filter(f)
 		if self.done() then

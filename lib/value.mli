@@ -21,8 +21,8 @@ val make_trait: string -> string list -> (string * t) list -> trait
 val make_struct: type' -> t list -> t
 val fields: type' -> string list
 val type_name: t -> string
-val type_of: t -> type'
 val dot: t -> string -> t
+val dot_assign: t -> string -> t -> unit
 val match': Exp.t -> t -> (string * t) list option
 val impl: trait option -> t -> (string * t) list -> unit
 
@@ -40,3 +40,4 @@ val base_trait: trait
 val printable_trait: trait
 val field_undefined_error_type: type'
 val trait_not_implemented_error_type: type'
+val primitive_error_type: type'

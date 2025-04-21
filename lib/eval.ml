@@ -29,7 +29,8 @@ let rec eval (exp: Exp.t) env: Value.t =
     (try
       eval b env
     with
-    | Value.Runtime_error e -> (match List.find_map (fun (p, b) -> Option.bind (Value.match' p e) (fun e' -> Some (eval b (Env.create e' (Some env))))) cs with
+    | Value.Runtime_error e ->
+      (match List.find_map (fun (p, b) -> Option.bind (Value.match' p e) (fun e' -> Some (eval b (Env.create e' (Some env))))) cs with
       | Some v' -> v'
       | None -> VNull))
   | EThrow e -> raise (Value.Runtime_error (eval e env))
@@ -37,14 +38,8 @@ let rec eval (exp: Exp.t) env: Value.t =
     Env.bind_list env (Value.match' p (eval v env) |> Option.value ~default: []);
     VNull
   | EDotAssign (o, f, v) ->
-    (match eval o env with
-    | VStruct (t, fs) ->
-      (if Hashtbl.mem fs f then
-        Hashtbl.replace fs f (eval v env)
-      else
-        Value.throw Value.field_undefined_error_type (Value.type_name (VType t) ^ " does not have field " ^ f));
-      VNull
-    | _ -> Value.throw Value.field_undefined_error_type "Primitive values have no fields")
+    Value.dot_assign (eval o env) f (eval v env);
+    VNull
   | EDef (n, ps, b) ->
     Env.bind env n (VFunction (n, ps, b, env));
     VNull
@@ -61,7 +56,7 @@ let rec eval (exp: Exp.t) env: Value.t =
     VNull
   | EModule (n, es, b) ->
     let e = Env.create [] (Some env) in
-    eval b e;
+    eval b e |> ignore;
     Env.bind env n (VStruct (Value.module_type, (List.map (fun x -> (x, Env.lookup e x)) es @ [("__name", VString n)]) |> List.to_seq |> Hashtbl.of_seq));
     VNull
   | EImport f ->
@@ -72,7 +67,7 @@ and call func args =
   | VFunction (_, ps, b, e) -> eval b (Env.create (List.combine ps args) (Some e))
   | VPrimitive p -> p args
   | VType t -> Value.make_struct t args
-  | _ -> failwith "Not a function"
+  | _ -> failwith (to_string func ^ " is not a function")
 and run_file filename env =
   try
     eval (In_channel.open_text filename |> from_channel |> Parser.prog Lexer.read) env |> ignore

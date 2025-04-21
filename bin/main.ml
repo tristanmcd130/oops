@@ -3,10 +3,17 @@ open Lexing
 
 let global_env = Env.create [
   ("print", Value.VPrimitive (fun [x] -> Eval.to_string x |> print_endline; VNull));
-  ("List", VType Value.list_type);
+  ("Null", VType Value.null_type);
+  ("Bool", VType Value.bool_type);
+  ("Number", VType Value.number_type);
   ("String", VType Value.string_type);
+  ("List", VType Value.list_type);
   ("Dict", VType Value.dict_type);
+  ("Function", VType Value.function_type);
+  ("Type", VType Value.type_type);
+  ("Trait", VType Value.trait_type);
   ("Module", VType Value.module_type);
+  ("Base", VTrait Value.base_trait);
   ("Printable", VTrait Value.printable_trait);
   ("sqrt", VPrimitive (fun [VNumber x] -> VNumber (sqrt x)));
   ("max", VPrimitive (fun [VNumber x; VNumber y] -> VNumber (max x y)));

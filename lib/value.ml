@@ -30,6 +30,7 @@ let error_trait = {name = "Error"; traits = []; abs_methods = ["message"]; metho
 let field_undefined_error_type = {name = "FieldUndefinedError"; traits = [error_trait; base_trait]; fields = ["msg"]; methods = Hashtbl.create 16}
 let trait_not_implemented_error_type = {name = "TraitNotImplementedError"; traits = [error_trait; base_trait]; fields = ["msg"]; methods = Hashtbl.create 16}
 let variable_undefined_error_type = {name = "VariableUndefinedError"; traits = [error_trait; base_trait]; fields = ["msg"]; methods = Hashtbl.create 16}
+let primitive_error_type = {name = "PrimitiveError"; traits = [error_trait; base_trait]; fields = ["msg"]; methods = Hashtbl.create 16}
 let printable_trait = {name = "Printable"; traits = []; abs_methods = ["to_string"]; methods = Hashtbl.create 16}
 
 let make_type name fields = {name = name; traits = [base_trait]; fields = fields; methods = Hashtbl.create 16}
@@ -78,6 +79,14 @@ let dot value name =
     | Some f -> f
     | None -> get_method value name)
   | v -> get_method v name
+let dot_assign obj field value =
+  match obj with
+  | VStruct (t, fs) ->
+    (if Hashtbl.mem fs field then
+      Hashtbl.replace fs field value
+    else
+      throw field_undefined_error_type (t.name ^ " does not have field " ^ field))
+  | _ -> throw field_undefined_error_type "Primitive values have no fields"
 
 let rec make_literal = function
 | Exp.EBool b -> VBool b
@@ -157,7 +166,7 @@ let impl trait type' methods =
   | None -> add_methods type' methods;;
 
 impl (Some printable_trait) (VType null_type) [
-  ("to_string", VPrimitive (fun _ -> VString "null"));
+  ("to_string", VPrimitive (fun [_] -> VString "null"));
 ];
 impl None (VType bool_type) [
   ("and", VPrimitive (fun [VBool self; VBool other] -> VBool (self && other)));
@@ -184,7 +193,6 @@ impl (Some printable_trait) (VType number_type) [
   ("to_string", VPrimitive (fun [VNumber self ] -> VString (Printf.sprintf "%g" self)));
 ];
 impl None (VType string_type) [
-  ("to_string", VPrimitive (fun [self] -> self));
   ("+", VPrimitive (fun [VString self; VString other] -> VString (String.cat self other)));
   ("head", VPrimitive (fun [VString self] ->  VString (self.[0] |> String.make 1)));
   ("tail", VPrimitive (fun [VString self] ->  VString (String.sub self 1 (String.length self - 1))));
