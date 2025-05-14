@@ -33,7 +33,7 @@ rule read =
 	| "if"		{IF}
 	| "then"	{THEN}
 	| "else"	{ELSE}
-	| "cond"	{COND}
+	| "elseif"	{ELSEIF}
 	| '|'		{BAR}
 	| "->"		{ARROW}
 	| "match"	{MATCH}

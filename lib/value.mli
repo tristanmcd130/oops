@@ -1,15 +1,15 @@
 type t =
-| VNull
-| VBool of bool
-| VNumber of float
-| VString of string
-| VList of t list
-| VDict of (t, t) Hashtbl.t
-| VFunction of string * string list * Exp.t * t Env.t
-| VPrimitive of (t list -> t)
-| VStruct of (type' * (string, t) Hashtbl.t)
-| VType of type'
-| VTrait of trait
+| Null
+| Bool of bool
+| Number of float
+| String of string
+| List of t list
+| Dict of (t, t) Hashtbl.t
+| Function of string * string list * Exp.t * t Env.t
+| Primitive of (t list -> t)
+| Struct of (type' * (string, t) Hashtbl.t)
+| Type of type'
+| Trait of trait
 and type'
 and trait
 

@@ -1,15 +1,15 @@
 type t =
-| VNull
-| VBool of bool
-| VNumber of float
-| VString of string
-| VList of t list
-| VDict of (t, t) Hashtbl.t
-| VFunction of string * string list * Exp.t * t Env.t
-| VPrimitive of (t list -> t)
-| VStruct of (type' * (string, t) Hashtbl.t)
-| VType of type'
-| VTrait of trait
+| Null
+| Bool of bool
+| Number of float
+| String of string
+| List of t list
+| Dict of (t, t) Hashtbl.t
+| Function of string * string list * Exp.t * t Env.t
+| Primitive of (t list -> t)
+| Struct of (type' * (string, t) Hashtbl.t)
+| Type of type'
+| Trait of trait
 and type' = {name: string; mutable traits: trait list; fields: string list; methods: (string, t) Hashtbl.t}
 and trait = {name: string; mutable traits: trait list; abs_methods: string list; methods: (string, t) Hashtbl.t}
 
@@ -35,27 +35,27 @@ let printable_trait = {name = "Printable"; traits = []; abs_methods = ["to_strin
 
 let make_type name fields = {name = name; traits = [base_trait]; fields = fields; methods = Hashtbl.create 16}
 let make_trait name abs_methods methods = {name = name; traits = []; abs_methods = abs_methods; methods = methods |> List.to_seq |> Hashtbl.of_seq}
-let make_struct type' args = VStruct (type', List.combine type'.fields args |> List.to_seq |> Hashtbl.of_seq)
-let throw error_type msg = raise (Runtime_error (make_struct error_type [VString msg]))
+let make_struct type' args = Struct (type', List.combine type'.fields args |> List.to_seq |> Hashtbl.of_seq)
+let throw error_type msg = raise (Runtime_error (make_struct error_type [String msg]))
 
 let fields type' = type'.fields
 let type_name = function
-| VType t -> t.name
-| VTrait t-> t.name
+| Type t -> t.name
+| Trait t-> t.name
 let type_of = function
-| VStruct (t, _) -> t
-| VNull -> null_type
-| VBool _ -> bool_type
-| VNumber _ -> number_type
-| VString _ -> string_type
-| VList _ -> list_type
-| VDict _ -> dict_type
-| VFunction _ | VPrimitive _ -> function_type
-| VType _ -> type_type
-| VTrait _ -> trait_type
+| Struct (t, _) -> t
+| Null -> null_type
+| Bool _ -> bool_type
+| Number _ -> number_type
+| String _ -> string_type
+| List _ -> list_type
+| Dict _ -> dict_type
+| Function _ | Primitive _ -> function_type
+| Type _ -> type_type
+| Trait _ -> trait_type
 let bind_self obj = function
-| VFunction (n, ps, b, e) -> VFunction (n, ps, b, Env.create [("self", obj)] (Some e))
-| VPrimitive p -> VPrimitive (fun args -> p (obj :: args))
+| Function (n, ps, b, e) -> Function (n, ps, b, Env.create [("self", obj)] (Some e))
+| Primitive p -> Primitive (fun args -> p (obj :: args))
 | _ -> failwith "Not a function"
 let rec get_method_from_traits (traits: trait list) name =
   match traits with
@@ -74,14 +74,14 @@ let get_method_from_type type' name =
 let get_method value name = get_method_from_type (type_of value) name |> bind_self value
 let dot value name =
   match value with
-  | VStruct (_, fs) ->
+  | Struct (_, fs) ->
     (match Hashtbl.find_opt fs name with
     | Some f -> f
     | None -> get_method value name)
   | v -> get_method v name
 let dot_assign obj field value =
   match obj with
-  | VStruct (t, fs) ->
+  | Struct (t, fs) ->
     (if Hashtbl.mem fs field then
       Hashtbl.replace fs field value
     else
@@ -89,52 +89,52 @@ let dot_assign obj field value =
   | _ -> throw field_undefined_error_type "Primitive values have no fields"
 
 let rec make_literal = function
-| Exp.EBool b -> VBool b
-| ENumber n -> VNumber n
-| EString s -> VString s
-| EList l -> VList (List.map make_literal l)
-| EDict d -> VDict (List.map (fun (k, v) -> (make_literal k, make_literal v)) d |> List.to_seq |> Hashtbl.of_seq)
+| Exp.Bool b -> Bool b
+| Number n -> Number n
+| String s -> String s
+| List l -> List (List.map make_literal l)
+| Dict d -> Dict (List.map (fun (k, v) -> (make_literal k, make_literal v)) d |> List.to_seq |> Hashtbl.of_seq)
 | _ -> failwith "match fails on dicts containing non-literals"
 let rec match' pattern value =
   match (pattern, value) with
-  | (Exp.ENull, VNull) -> Some []
-  | (EBool b, VBool b') when b = b' -> Some []
-  | (ENumber n, VNumber n') when n = n' -> Some []
-  | (EString s, VString s') when s = s' -> Some []
-  | (EList [], VList []) -> Some []
-  | (EList (p :: ps), VList (v :: vs)) ->
+  | (Exp.Null, Null) -> Some []
+  | (Bool b, Bool b') when b = b' -> Some []
+  | (Number n, Number n') when n = n' -> Some []
+  | (String s, String s') when s = s' -> Some []
+  | (List [], List []) -> Some []
+  | (List (p :: ps), List (v :: vs)) ->
     (match match' p v with
     | Some bs ->
-      (match match' (EList ps) (VList vs) with
+      (match match' (List ps) (List vs) with
       | Some bs' -> Some (bs' @ bs)
       | None -> None)
     | None -> None)
-  | (EDict [], _) -> Some []
-  | (EDict ((k, v) :: d), VDict d') ->
+  | (Dict [], _) -> Some []
+  | (Dict ((k, v) :: d), Dict d') ->
     (match Hashtbl.find_opt d' (make_literal k) with
     | Some v' ->
       (match match' v v' with
       | Some bs ->
-        (match match' (EDict d) (VDict d') with
+        (match match' (Dict d) (Dict d') with
         | Some bs' -> Some (bs' @ bs)
         | None -> None)
       | None -> None)
     | None -> None)
-  | (EVar "_", _) -> Some []
-  | (EVar n, v) -> Some [(n, v)]
-  | (ECall (EDot (ps, "::"), [p]), VList (v :: vs)) ->
+  | (Var "_", _) -> Some []
+  | (Var n, v) -> Some [(n, v)]
+  | (Call (Dot (ps, "::"), [p]), List (v :: vs)) ->
     (match match' p v with
     | Some bs ->
-      (match match' ps (VList vs) with
+      (match match' ps (List vs) with
       | Some bs' -> Some (bs' @ bs)
       | None -> None)
     | None -> None)
-  | (ECall (EVar s, ps), VStruct (t, fs)) when s = t.name -> match' (EList ps) (VList (List.map (Hashtbl.find fs) t.fields))
-  | (ECall (EDot (p1, "or"), [p2]), v) ->
+  | (Call (Var s, ps), Struct (t, fs)) when s = t.name -> match' (List ps) (List (List.map (Hashtbl.find fs) t.fields))
+  | (Call (Dot (p1, "or"), [p2]), v) ->
     (match match' p1 v with
     | Some bs -> Some bs
     | None -> match' p2 v)
-  | (ECall (EDot (p1, "and"), [p2]), v) ->
+  | (Call (Dot (p1, "and"), [p2]), v) ->
     (match match' p1 v with
     | Some bs ->
       (match match' p2 v with
@@ -145,16 +145,16 @@ let rec match' pattern value =
 
 let subset a b = List.for_all (fun x -> List.mem x b) a
 let rec method_names = function
-| VType t -> (t.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ (t.traits |> List.map (fun x -> VTrait x) |> List.concat_map method_names)
-| VTrait t -> (t.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ (t.traits |> List.map (fun x -> VTrait x) |> List.concat_map method_names)
+| Type t -> (t.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ (t.traits |> List.map (fun x -> Trait x) |> List.concat_map method_names)
+| Trait t -> (t.methods |> Hashtbl.to_seq_keys |> List.of_seq) @ (t.traits |> List.map (fun x -> Trait x) |> List.concat_map method_names)
 let add_trait type' trait =
   match type' with
-  | VType t -> t.traits <- trait :: t.traits
-  | VTrait t -> t.traits <- trait :: t.traits
+  | Type t -> t.traits <- trait :: t.traits
+  | Trait t -> t.traits <- trait :: t.traits
 let add_methods type' methods =
   match type' with
-  | VType t -> Hashtbl.replace_seq t.methods (methods |> List.to_seq)
-  | VTrait t -> Hashtbl.replace_seq t.methods (methods |> List.to_seq)
+  | Type t -> Hashtbl.replace_seq t.methods (methods |> List.to_seq)
+  | Trait t -> Hashtbl.replace_seq t.methods (methods |> List.to_seq)
 let impl trait type' methods =
   match trait with
   | Some t ->
@@ -165,65 +165,65 @@ let impl trait type' methods =
       throw trait_not_implemented_error_type (type_name type' ^ " does not fully implement " ^ t.name ^ ": " ^ String.concat ", " (List.filter (fun x -> not (List.mem x (method_names type' @ List.map fst methods))) t.abs_methods))
   | None -> add_methods type' methods;;
 
-impl (Some printable_trait) (VType null_type) [
-  ("to_string", VPrimitive (fun [_] -> VString "null"));
+impl (Some printable_trait) (Type null_type) [
+  ("to_string", Primitive (fun [_] -> String "null"));
 ];
-impl None (VType bool_type) [
-  ("and", VPrimitive (fun [VBool self; VBool other] -> VBool (self && other)));
-  ("or", VPrimitive (fun [VBool self; VBool other] -> VBool (self || other)));
-  ("not", VPrimitive (fun [VBool self] -> VBool (not self)));
+impl None (Type bool_type) [
+  ("and", Primitive (fun [Bool self; Bool other] -> Bool (self && other)));
+  ("or", Primitive (fun [Bool self; Bool other] -> Bool (self || other)));
+  ("not", Primitive (fun [Bool self] -> Bool (not self)));
 ];
-impl (Some printable_trait) (VType bool_type) [
-  ("to_string", VPrimitive (fun [VBool self ] -> VString (string_of_bool self)));
+impl (Some printable_trait) (Type bool_type) [
+  ("to_string", Primitive (fun [Bool self ] -> String (string_of_bool self)));
 ];
-impl None (VType number_type) [
-  ("+", VPrimitive (fun [VNumber self; VNumber other] -> VNumber (self +. other)));
-  ("-", VPrimitive (fun [VNumber self; VNumber other] -> VNumber (self -. other)));
-  ("u-", VPrimitive (fun [VNumber self] -> VNumber ~-.self));
-  ("*", VPrimitive (fun [VNumber self; VNumber other] -> VNumber (self *. other)));
-  ("/", VPrimitive (fun [VNumber self; VNumber other] -> VNumber (self /. other)));
-  ("%", VPrimitive (fun [VNumber self; VNumber other] -> VNumber (mod_float self other)));
-  ("<", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self < other)));
-  ("<=", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self <= other)));
-  ("!=", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self <> other)));
-  (">", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self > other)));
-  (">=", VPrimitive (fun [VNumber self; VNumber other] -> VBool (self >= other)));
+impl None (Type number_type) [
+  ("+", Primitive (fun [Number self; Number other] -> Number (self +. other)));
+  ("-", Primitive (fun [Number self; Number other] -> Number (self -. other)));
+  ("u-", Primitive (fun [Number self] -> Number ~-.self));
+  ("*", Primitive (fun [Number self; Number other] -> Number (self *. other)));
+  ("/", Primitive (fun [Number self; Number other] -> Number (self /. other)));
+  ("%", Primitive (fun [Number self; Number other] -> Number (mod_float self other)));
+  ("<", Primitive (fun [Number self; Number other] -> Bool (self < other)));
+  ("<=", Primitive (fun [Number self; Number other] -> Bool (self <= other)));
+  ("!=", Primitive (fun [Number self; Number other] -> Bool (self <> other)));
+  (">", Primitive (fun [Number self; Number other] -> Bool (self > other)));
+  (">=", Primitive (fun [Number self; Number other] -> Bool (self >= other)));
 ];
-impl (Some printable_trait) (VType number_type) [
-  ("to_string", VPrimitive (fun [VNumber self ] -> VString (Printf.sprintf "%g" self)));
+impl (Some printable_trait) (Type number_type) [
+  ("to_string", Primitive (fun [Number self ] -> String (Printf.sprintf "%g" self)));
 ];
-impl None (VType string_type) [
-  ("+", VPrimitive (fun [VString self; VString other] -> VString (String.cat self other)));
-  ("head", VPrimitive (fun [VString self] ->  VString (self.[0] |> String.make 1)));
-  ("tail", VPrimitive (fun [VString self] ->  VString (String.sub self 1 (String.length self - 1))));
-  ("length", VPrimitive (fun [VString self] ->  VNumber (String.length self |> float_of_int)));
+impl None (Type string_type) [
+  ("+", Primitive (fun [String self; String other] -> String (String.cat self other)));
+  ("head", Primitive (fun [String self] ->  String (self.[0] |> String.make 1)));
+  ("tail", Primitive (fun [String self] ->  String (String.sub self 1 (String.length self - 1))));
+  ("length", Primitive (fun [String self] ->  Number (String.length self |> float_of_int)));
 ];
-impl (Some printable_trait) (VType string_type) [
-  ("to_string", VPrimitive (fun [self] -> self));
+impl (Some printable_trait) (Type string_type) [
+  ("to_string", Primitive (fun [self] -> self));
 ];
-impl None (VType list_type) [
-  ("head", VPrimitive (fun [VList self] ->  List.hd self));
-  ("tail", VPrimitive (fun [VList self] ->  VList (List.tl self)));
-  ("length", VPrimitive (fun [VList self] ->  VNumber (List.length self |> float_of_int)));
-  ("at", VPrimitive (fun [VList self; VNumber index] -> List.nth self (int_of_float index)));
-  ("+", VPrimitive (fun [VList self; VList other] -> VList (self @ other)));
-  ("::", VPrimitive (fun [VList self; other] -> VList (other :: self)));
+impl None (Type list_type) [
+  ("head", Primitive (fun [List self] ->  List.hd self));
+  ("tail", Primitive (fun [List self] ->  List (List.tl self)));
+  ("length", Primitive (fun [List self] ->  Number (List.length self |> float_of_int)));
+  ("at", Primitive (fun [List self; Number index] -> List.nth self (int_of_float index)));
+  ("+", Primitive (fun [List self; List other] -> List (self @ other)));
+  ("::", Primitive (fun [List self; other] -> List (other :: self)));
 ];
-impl None (VType dict_type) [
-  ("at", VPrimitive (fun [VDict self; index] -> Hashtbl.find self index));
-  ("pairs", VPrimitive (fun [VDict self] -> VList (Hashtbl.to_seq self |> List.of_seq |> List.map (fun (k, v) -> VList [k; v])));)
+impl None (Type dict_type) [
+  ("at", Primitive (fun [Dict self; index] -> Hashtbl.find self index));
+  ("pairs", Primitive (fun [Dict self] -> List (Hashtbl.to_seq self |> List.of_seq |> List.map (fun (k, v) -> List [k; v])));)
 ];
-impl (Some printable_trait) (VType function_type) [
-  ("to_string", VPrimitive (function [VFunction (n, _, _, _)] -> VString ("<function" ^ (if n = "" then "" else " " ^ n) ^ ">") | [VPrimitive _] -> VString "<primitive>"));
+impl (Some printable_trait) (Type function_type) [
+  ("to_string", Primitive (function [Function (n, _, _, _)] -> String ("<function" ^ (if n = "" then "" else " " ^ n) ^ ">") | [Primitive _] -> String "<primitive>"));
 ];
-impl (Some printable_trait) (VType type_type) [
-  ("to_string", VPrimitive (fun [VType t] -> VString ("<type " ^ t.name ^ ">")));
+impl (Some printable_trait) (Type type_type) [
+  ("to_string", Primitive (fun [Type t] -> String ("<type " ^ t.name ^ ">")));
 ];
-impl (Some printable_trait) (VType trait_type) [
-  ("to_string", VPrimitive (fun [VTrait t] -> VString ("<trait " ^ t.name ^ ">")));
+impl (Some printable_trait) (Type trait_type) [
+  ("to_string", Primitive (fun [Trait t] -> String ("<trait " ^ t.name ^ ">")));
 ];
-impl (Some printable_trait) (VTrait error_trait) [
-  ("to_string", VPrimitive (fun [VStruct (t, fs)] ->
-    let (VString msg) = Hashtbl.find fs "msg" in
-    VString (t.name ^ ": " ^ msg)));
+impl (Some printable_trait) (Trait error_trait) [
+  ("to_string", Primitive (fun [Struct (t, fs)] ->
+    let (String msg) = Hashtbl.find fs "msg" in
+    String (t.name ^ ": " ^ msg)));
 ];

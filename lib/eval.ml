@@ -1,72 +1,71 @@
 open Lexing
 
-let rec eval (exp: Exp.t) env: Value.t =
+let rec eval exp env =
   match exp with
-  | EBlock [e] -> eval e env
-  | EBlock [] | ENull | ECond [] | EMatch (_, []) -> VNull
-  | EBlock (e :: es) ->
+  | Exp.Block [e] -> eval e env
+  | Block [] | Null | Match (_, []) -> Value.Null
+  | Block (e :: es) ->
     eval e env |> ignore;
-    eval (EBlock es) env
-  | EBool b -> VBool b
-  | ENumber n -> VNumber n
-  | EString s -> VString s
-  | EList l -> VList (List.map (fun x -> eval x env) l)
-  | EDict d -> VDict (List.map (fun (k, v) -> (eval k env, eval v env)) d |> List.to_seq |> Hashtbl.of_seq)
-  | EFun (ps, b) -> VFunction ("", ps, b, env)
-  | EVar v -> Env.lookup env v
-  | EDot (o, f) -> Value.dot (eval o env) f
-  | ECall (f, a) -> call (eval f env) (List.map (fun x -> eval x env) a)
-  | EIf (c, t, e) -> eval (if eval c env = VBool true then t else e) env
-  | ECond ((c, b) :: cs) -> eval (if eval c env = VBool true then b else ECond cs) env
-  | EMatch (e, cs) ->
+    eval (Block es) env
+  | Bool b -> Bool b
+  | Number n -> Number n
+  | String s -> String s
+  | List l -> List (List.map (fun x -> eval x env) l)
+  | Dict d -> Dict (List.map (fun (k, v) -> (eval k env, eval v env)) d |> List.to_seq |> Hashtbl.of_seq)
+  | Fun (ps, b) -> Function ("", ps, b, env)
+  | Var v -> Env.lookup env v
+  | Dot (o, f) -> Value.dot (eval o env) f
+  | Call (f, a) -> call (eval f env) (List.map (fun x -> eval x env) a)
+  | If ((c, b) :: cs) -> eval (if eval c env = Bool true then b else If cs) env
+  | Match (e, cs) ->
     let v = eval e env in
     (match List.find_map (fun (p, b) -> Option.bind (Value.match' p v) (fun e -> Some (eval b (Env.create e (Some env))))) cs with
     | Some v' -> v'
-    | None -> VNull)
-  | ELet ([], b) -> eval b env
-  | ELet ((p, v) :: ds, b) -> eval (ELet (ds, b)) (Env.create (Value.match' p (eval v env) |> Option.get) (Some env))
-  | ETry (b, cs) ->
+    | None -> Null)
+  | Let ([], b) -> eval b env
+  | Let ((p, v) :: ds, b) -> eval (Let (ds, b)) (Env.create (Value.match' p (eval v env) |> Option.get) (Some env))
+  | Try (b, cs) ->
     (try
       eval b env
     with
     | Value.Runtime_error e ->
       (match List.find_map (fun (p, b) -> Option.bind (Value.match' p e) (fun e' -> Some (eval b (Env.create e' (Some env))))) cs with
       | Some v' -> v'
-      | None -> VNull))
-  | EThrow e -> raise (Value.Runtime_error (eval e env))
-  | EAssign (p, v) ->
+      | None -> Null))
+  | Throw e -> raise (Value.Runtime_error (eval e env))
+  | Assign (p, v) ->
     Env.bind_list env (Value.match' p (eval v env) |> Option.value ~default: []);
-    VNull
-  | EDotAssign (o, f, v) ->
+    Null
+  | DotAssign (o, f, v) ->
     Value.dot_assign (eval o env) f (eval v env);
-    VNull
-  | EDef (n, ps, b) ->
-    Env.bind env n (VFunction (n, ps, b, env));
-    VNull
-  | EStruct (n, fs) ->
-    Env.bind env n (VType (Value.make_type n fs));
-    VNull
-  | ETrait (n, ams, ms) ->
-    Env.bind env n (VTrait (Value.make_trait n ams (List.map (fun (n', ps, b) -> (n', Value.VFunction (n ^ "." ^ n', ps, b, env))) ms)));
-    VNull
-  | EImpl (tr, ty, ms) ->
-    let tr' = Option.bind (Option.bind tr (fun x -> Some (eval x env))) (fun (VTrait x) -> Some x) in
+    Null
+  | Def (n, ps, b) ->
+    Env.bind env n (Function (n, ps, b, env));
+    Null
+  | Struct (n, fs) ->
+    Env.bind env n (Type (Value.make_type n fs));
+    Null
+  | Trait (n, ams, ms) ->
+    Env.bind env n (Trait (Value.make_trait n ams (List.map (fun (n', ps, b) -> (n', Value.Function (n ^ "." ^ n', ps, b, env))) ms)));
+    Null
+  | Impl (tr, ty, ms) ->
+    let tr' = Option.bind (Option.bind tr (fun x -> Some (eval x env))) (fun (Trait x) -> Some x) in
     let ty' = eval ty env in
-    Value.impl tr' ty' (List.map (fun (n, ps, b) -> (n, Value.VFunction (Value.type_name ty' ^ "." ^ n, ps, b, env))) ms);
-    VNull
-  | EModule (n, es, b) ->
+    Value.impl tr' ty' (List.map (fun (n, ps, b) -> (n, Value.Function (Value.type_name ty' ^ "." ^ n, ps, b, env))) ms);
+    Null
+  | Module (n, es, b) ->
     let e = Env.create [] (Some env) in
     eval b e |> ignore;
-    Env.bind env n (VStruct (Value.module_type, (List.map (fun x -> (x, Env.lookup e x)) es @ [("__name", VString n)]) |> List.to_seq |> Hashtbl.of_seq));
-    VNull
-  | EImport f ->
+    Env.bind env n (Struct (Value.module_type, (List.map (fun x -> (x, Env.lookup e x)) es @ [("__name", String n)]) |> List.to_seq |> Hashtbl.of_seq));
+    Null
+  | Import f ->
     run_file f env;
-    VNull
+    Null
 and call func args =
   match func with
-  | VFunction (_, ps, b, e) -> eval b (Env.create (List.combine ps args) (Some e))
-  | VPrimitive p -> p args
-  | VType t -> Value.make_struct t args
+  | Function (_, ps, b, e) -> eval b (Env.create (List.combine ps args) (Some e))
+  | Primitive p -> p args
+  | Type t -> Value.make_struct t args
   | _ -> failwith (to_string func ^ " is not a function")
 and run_file filename env =
   try
@@ -76,7 +75,7 @@ and run_file filename env =
   | e -> print_endline ("Uncaught primitive error: " ^ Printexc.to_string e)
 and to_string obj =
   match call (Value.dot obj "to_string") [] with
-  | VString s -> s
+  | String s -> s
   | _ -> failwith "Not a string";;
 
 let rec format string values =
@@ -92,17 +91,17 @@ let rec format string values =
       (List.nth values num |> to_string) ^ format (String.sub string (num_len + 2) (String.length string - num_len - 2)) values
     | x -> x ^ format (String.sub string 1 (String.length string - 1)) values;;
 
-Value.impl (Some Value.printable_trait) (VTrait Value.base_trait) [
-  ("to_string", VPrimitive (fun [VStruct (t, fs)] -> VString ((VType t |> Value.type_name) ^ "(" ^ (List.map (Hashtbl.find fs) (Value.fields t) |> List.map to_string |> String.concat ", ") ^ ")")));
-  ("==", VPrimitive (fun [self; other] -> VBool (self = other)));
-  ("!=", VPrimitive (fun [self; other] -> VBool (self <> other)));
+Value.impl (Some Value.printable_trait) (Trait Value.base_trait) [
+  ("to_string", Primitive (fun [Struct (t, fs)] -> String ((Type t |> Value.type_name) ^ "(" ^ (List.map (Hashtbl.find fs) (Value.fields t) |> List.map to_string |> String.concat ", ") ^ ")")));
+  ("==", Primitive (fun [self; other] -> Bool (self = other)));
+  ("!=", Primitive (fun [self; other] -> Bool (self <> other)));
 ];
-Value.impl None (VType Value.string_type) [
-  ("format", VPrimitive (fun [VString self; VList args] -> VString (format self args)));
+Value.impl None (Type Value.string_type) [
+  ("format", Primitive (fun [String self; List args] -> String (format self args)));
 ];
-Value.impl (Some Value.printable_trait) (VType Value.list_type) [
-  ("to_string", VPrimitive (fun [VList self] -> VString ("[" ^ String.concat ", " (List.map to_string self) ^ "]")));
+Value.impl (Some Value.printable_trait) (Type Value.list_type) [
+  ("to_string", Primitive (fun [List self] -> String ("[" ^ String.concat ", " (List.map to_string self) ^ "]")));
 ];
-Value.impl (Some Value.printable_trait) (VType Value.dict_type) [
-  ("to_string", VPrimitive (fun [VDict self] -> VString ("{" ^ String.concat ", " (Hashtbl.to_seq self |> List.of_seq |> List.map (fun (k, v) -> to_string k ^ ": " ^ to_string v)) ^ "}")));
+Value.impl (Some Value.printable_trait) (Type Value.dict_type) [
+  ("to_string", Primitive (fun [Dict self] -> String ("{" ^ String.concat ", " (Hashtbl.to_seq self |> List.of_seq |> List.map (fun (k, v) -> to_string k ^ ": " ^ to_string v)) ^ "}")));
 ];

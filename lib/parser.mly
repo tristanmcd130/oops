@@ -17,7 +17,7 @@
 %token IF
 %token THEN
 %token ELSE
-%token COND
+%token ELSEIF
 %token BAR
 %token ARROW
 %token MATCH
@@ -64,20 +64,20 @@
 prog: b = block; EOF	{b}
 
 block:
-	|						{EBlock []}
+	|						{Block []}
 	| s = stmt				{s}
-	| s = stmt; ss = stmt+	{EBlock (s :: ss)}
+	| s = stmt; ss = stmt+	{Block (s :: ss)}
 
 stmt:
-	| a = assign																{match a with (n, v) -> EAssign (n, v)}
-	| o = exp; DOT; f = ID; EQUAL; v = exp										{EDotAssign (o, f, v)}
-	| d = def																	{match d with (n, ps, b) -> EDef (n, ps, b)}
-	| STRUCT; n = ID; fs = ID*; END												{EStruct (n, fs)}
-	| TRAIT; n = ID; ams = ID*; ms = def*; END									{ETrait (n, ams, ms)}
-	| IMPL; t = exp?; FOR; n = exp; ms = def*; END								{EImpl (t, n, ms)}
-	| MODULE; n = ID; EXPORTS; es = separated_list(COMMA, ID); b = block; END	{EModule (n, es, b)}
-	| IMPORT; f = STRING														{EImport f}
-	| THROW; e = exp															{Exp.EThrow e}
+	| a = assign																{match a with (n, v) -> Assign (n, v)}
+	| o = exp; DOT; f = ID; EQUAL; v = exp										{DotAssign (o, f, v)}
+	| d = def																	{match d with (n, ps, b) -> Def (n, ps, b)}
+	| STRUCT; n = ID; fs = ID*; END												{Struct (n, fs)}
+	| TRAIT; n = ID; ams = ID*; ms = def*; END									{Trait (n, ams, ms)}
+	| IMPL; t = exp?; FOR; n = exp; ms = def*; END								{Impl (t, n, ms)}
+	| MODULE; n = ID; EXPORTS; es = separated_list(COMMA, ID); b = block; END	{Module (n, es, b)}
+	| IMPORT; f = STRING														{Import f}
+	| THROW; e = exp															{Exp.Throw e}
 	| e = exp																	{e}
 
 assign: p = exp; EQUAL; v = exp	{(p, v)}
@@ -104,23 +104,22 @@ fun_id:
 	| i = ID	{i}
 
 exp:
-	| NULL																	{ENull}
-	| b = BOOL																{EBool b}
-	| n = NUMBER															{ENumber n}
-	| s = STRING															{EString s}
-	| LBRACKET; es = separated_list(COMMA, exp); RBRACKET					{EList es}
-	| LBRACE; es = separated_list(COMMA, dict_entry); RBRACE				{EDict es}
-	| FUN; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{EFun (ps, b)}
-	| v = ID																{EVar v}
-	| e = exp; DOT; f = fun_id												{EDot (e, f)}
-	| f = exp; LPAREN; a = separated_list(COMMA, exp); RPAREN				{ECall (f, a)}
-	| o = unary_op; e = exp													{ECall (EDot (e, o), [])}
-	| e1 = exp; o = binary_op; e2 = exp										{match o with "::" -> ECall (EDot (e2, o), [e1]) | _ -> ECall (EDot (e1, o), [e2])}
-	| IF; c = exp; THEN; t = block; ELSE; e = block; END					{EIf (c, t, e)}
-	| COND; cs = case*; END													{ECond cs}
-	| MATCH; e = exp; cs = case*; END										{EMatch (e, cs)}
-	| LET; a = separated_list(COMMA, assign); IN; b = block; END			{ELet (a, b)}
-	| TRY; b = block; CATCH; cs = case*; END								{ETry (b, cs)}
+	| NULL																	{Null}
+	| b = BOOL																{Bool b}
+	| n = NUMBER															{Number n}
+	| s = STRING															{String s}
+	| LBRACKET; es = separated_list(COMMA, exp); RBRACKET					{List es}
+	| LBRACE; es = separated_list(COMMA, dict_entry); RBRACE				{Dict es}
+	| FUN; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{Fun (ps, b)}
+	| v = ID																{Var v}
+	| e = exp; DOT; f = fun_id												{Dot (e, f)}
+	| f = exp; LPAREN; a = separated_list(COMMA, exp); RPAREN				{Call (f, a)}
+	| o = unary_op; e = exp													{Call (Dot (e, o), [])}
+	| e1 = exp; o = binary_op; e2 = exp										{match o with "::" -> Call (Dot (e2, o), [e1]) | _ -> Call (Dot (e1, o), [e2])}
+	| IF; c = exp; THEN; t = block; es = elseif*; e = else_; END			{If (((c, t) :: es) @ [e])}
+	| MATCH; e = exp; cs = case*; END										{Match (e, cs)}
+	| LET; a = separated_list(COMMA, assign); IN; b = block; END			{Let (a, b)}
+	| TRY; b = block; CATCH; cs = case*; END								{Try (b, cs)}
 	| LPAREN; e = exp; RPAREN												{e}
 
 dict_entry: k = exp; COLON; v = exp	{(k, v)}
@@ -144,5 +143,11 @@ dict_entry: k = exp; COLON; v = exp	{(k, v)}
 	| STAR		{"*"}
 	| SLASH		{"/"}
 	| PERCENT	{"%"}
+
+elseif: ELSEIF; c = exp; THEN; t = block	{(c, t)}
+
+else_:
+	|					{(Bool true, Null)}
+	| ELSE; b = block	{(Bool true, b)}
 
 case: BAR; t = exp; ARROW; b = block	{(t, b)}
