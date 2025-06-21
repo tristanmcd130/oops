@@ -2,9 +2,9 @@ open Oops
 
 let vm = Vm.make ([] |> List.to_seq |> Hashtbl.of_seq)
 let run_from_channel channel =
-  let chunk: Chunk.t = {code = [||]; constants = [||]; names = [||]} in
-  channel |> Lexing.from_channel |> Parser.program Lexer.read |> Chunk.compile chunk;
-  Vm.call vm {func = {chunk; num_args = 0; num_locals = 0}; upvalues = [||]} []
+  let chunk = Chunk.empty () in
+  channel |> Lexing.from_channel |> Parser.program Lexer.read |> Chunk.compile chunk (Scope.make None);
+  Vm.call vm (Chunk.to_closure chunk) []
 let rec repl line_num =
   Printf.printf "%d> " line_num;
   flush stdout;

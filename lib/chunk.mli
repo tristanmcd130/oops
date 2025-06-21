@@ -1,11 +1,11 @@
-type t = {
-  mutable code: Opcode.t array;
-  mutable constants: t Value.t array;
-  mutable names: string array;
-}
+type t
 
-val add_opcode: t -> Opcode.t -> int
-val add_constant: t -> t Value.t -> int
+val make: Opcode.t array -> t Value.t array -> string array -> t
+val empty: unit -> t
+val get_opcode: t -> int -> Opcode.t
+val get_constant: t -> int -> t Value.t
+val get_name: t -> int -> string
 val length: t -> int
-val compile: t -> Ast.t -> unit
+val compile: t -> Scope.t -> Ast.t -> unit
+val to_closure: t -> t Value.closure
 val to_string: t -> string

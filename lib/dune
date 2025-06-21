@@ -6,4 +6,4 @@
 
 (library
  (name oops)
- (modules lexer parser ast value opcode chunk vm))
+ (modules lexer parser ast value opcode scope chunk vm))

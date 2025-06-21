@@ -7,16 +7,14 @@ type 'a t =
 | Map of ('a t, 'a t) Hashtbl.t
 | Function of 'a func
 | Closure of 'a closure
-and 'a func = {
-  chunk: 'a;
-  num_args: int;
-  num_locals: int;
-}
-and 'a closure = {
-  func: 'a func;
-  upvalues: 'a t ref array;
-}
+| Cell of 'a t ref
+and 'a func
+and 'a closure
 
-val make_func: 'a -> int -> int -> 'a func
+val make_function: 'a -> int -> int -> 'a func
 val make_closure: 'a func -> 'a t ref array -> 'a closure
+val chunk: 'a closure -> 'a
+val num_args: 'a closure -> int
+val num_locals: 'a closure -> int
+val get_upvalue: 'a closure -> int -> 'a t ref
 val to_string: 'a t -> string
