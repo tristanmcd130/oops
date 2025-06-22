@@ -29,13 +29,29 @@ rule read = parse
 | '*'		{STAR}
 | '/'		{SLASH}
 | '%'		{PERCENT}
+| '<'		{LT}
+| "<="		{LE}
+| "=="		{EQ}
+| "!="		{NE}
+| '>'		{GT}
+| ">="		{GE}
+| "and"		{AND}
+| "or"		{OR}
+| "not"		{NOT}
+| "::"		{CONS}
 | "fun"		{FUN}
 | '('		{LPAREN}
 | ')'		{RPAREN}
 | "end"		{END}
-| "def"		{DEF}
-| id		{ID (lexbuf |> lexeme)}
 | '='		{EQUAL}
+| "def"		{DEF}
+| "if"		{IF}
+| "then"	{THEN}
+| "elseif"	{ELSEIF}
+| "else"	{ELSE}
+| "let"		{LET}
+| "in"		{IN}
+| id		{ID (lexbuf |> lexeme)}
 | _			{failwith ("Unexpected character: " ^ lexeme lexbuf)}
 | eof		{EOF}
 and read_string buf = parse

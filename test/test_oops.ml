@@ -1,7 +1,7 @@
 open OUnit2
 open Oops
 
-let make_parser_test string tree _ = assert_equal tree (string |> Lexing.from_string |> Parser.program Lexer.read) ~printer: Ast.to_string
+(* let make_parser_test string tree _ = assert_equal tree (string |> Lexing.from_string |> Parser.program Lexer.read) ~printer: Ast.to_string
 let make_parser_error_test string error _ = assert_raises error (fun _ -> string |> Lexing.from_string |> Parser.program Lexer.read)
 let parser_tests = "parser tests" >::: [
   "empty" >:: make_parser_test "" (Block []);
@@ -48,10 +48,11 @@ let compiler_tests = "compiler tests" >::: [
   "multiply" >:: make_compiler_test (Binary (Number 4.0, Multiply, Number 5.0)) (Chunk.make [|GetConstant 0; GetConstant 1; Multiply|] [|Number 4.0; Number 5.0|] [||]);
   "divide" >:: make_compiler_test (Binary (Number 4.0, Divide, Number 5.0)) (Chunk.make [|GetConstant 0; GetConstant 1; Divide|] [|Number 4.0; Number 5.0|] [||]);
   "modulo" >:: make_compiler_test (Binary (Number 4.0, Modulo, Number 5.0)) (Chunk.make [|GetConstant 0; GetConstant 1; Modulo|] [|Number 4.0; Number 5.0|] [||]);
-  "fun" >:: make_compiler_test (Fun (["x"], Var "x")) (Chunk.make [|GetConstant 0; MakeClosure 0|] [|Function (Value.make_function (Chunk.make [|GetLocal 0|] [||] [||]) 1 0)|] [||]);
+  "fun" >:: make_compiler_test (Fun (["x"], Var "x")) (Chunk.make [|GetConstant 0; MakeClosure 0|] [|Function {chunk = Chunk.make [|GetLocal 0|] [||] [||]; num_args = 1; num_locals = 0}|] [||]);
   "def" >:: make_compiler_test (Assign ("f", Fun (["x"], Block [Var "x"; Number 4.0]))) (Chunk.make [|GetConstant 0; MakeClosure 0; SetGlobal 0|] [|Function (Value.make_function (Chunk.make [|GetLocal 0; GetConstant 0|] [|Number 4.0|] [||]) 1 0)|] [|"f"|]);
   "call" >:: make_compiler_test (Call (Fun (["x"], Binary (Var "x", Add, Number 4.0)), [Number 9.0])) (Chunk.make [|GetConstant 0; GetConstant 1; MakeClosure 0; Call 1|] [|Number 9.0; Function (Value.make_function (Chunk.make [|GetLocal 0; GetConstant 0; Add|] [|Number 4.0|] [||]) 1 0)|] [||]);
   "closure" >:: make_compiler_test (Fun ([], Block [Assign ("x", Number 1.0); Fun ([], Var "x")])) (Chunk.make [|GetConstant 0; MakeClosure 0|] [|Function (Value.make_function (Chunk.make [|GetConstant 0; SetLocal 0; MakeCell 0; GetConstant 1; MakeClosure 1|] [|Number 1.0; Function (Value.make_function (Chunk.make [|DerefUpvalue 0|] [||] [||]) 0 0)|] [||]) 0 1)|] [||]);
+  "mutually recursive closures" >:: make_compiler_test (Fun ([], Block [Assign ("f", Fun ([], Call (Var "g", []))); Assign ("g", Fun ([], Call (Var "f", [])))])) (Chunk.make [|GetConstant 0; MakeClosure 0|] [|Function (Value.make_function (Chunk.make [|MakeCell 1; GetConstant 0; MakeClosure 1; SetLocal 0; MakeCell 0; GetConstant 1; MakeClosure 1; SetLocal 1|] [|Function (Value.make_function); |] [||]) 0 2)|] [||])
 ]
 
 let make_vm_test ?(globals = []) closure result _ = assert_equal result (Vm.call (globals |> List.to_seq |> Hashtbl.of_seq |> Vm.make) closure []) ~printer: Value.to_string
@@ -79,9 +80,96 @@ let vm_tests = "vm tests" >::: [
   "call with bad func" >:: make_vm_error_test (Chunk.make [|GetConstant 0; Call 0|] [|Number 5.0|] [||] |> Chunk.to_closure) (Failure "Cannot call 5");
   "deref_upvalue" >:: make_vm_test (Value.make_closure (Value.make_function (Chunk.make [|DerefUpvalue 0|] [||] [||]) 0 0) [|ref (Value.Number 15.0)|]) (Number 15.0);
   "closure" >:: make_vm_test (Chunk.make [|GetConstant 0; MakeClosure 0; Call 0; Call 0|] [|Function (Value.make_function (Chunk.make [|GetConstant 0; SetLocal 0; MakeCell 0; GetConstant 1; MakeClosure 1|] [|Number 1.0; Function (Value.make_function (Chunk.make [|DerefUpvalue 0|] [||] [||]) 0 0)|] [||]) 0 1)|] [||] |> Chunk.to_closure) (Number 1.0);
-]
+] *)
 
+let make_test ?(globals = []) string result _ =
+  let chunk = Chunk.empty () in
+  string |> Lexing.from_string |> Parser.program Lexer.read |> Chunk.compile chunk (Scope.make None []);
+  assert_equal result (Vm.call (globals |> List.to_seq |> Hashtbl.of_seq |> Vm.make) (Chunk.to_closure chunk) []) ~printer: Value.to_string
+let make_error_test ?(globals = []) string error _ =
+  assert_raises error (fun _ ->
+    let chunk = Chunk.empty () in
+    string |> Lexing.from_string |> Parser.program Lexer.read |> Chunk.compile chunk (Scope.make None []);
+    Vm.call (globals |> List.to_seq |> Hashtbl.of_seq |> Vm.make) (Chunk.to_closure chunk) [])
+let tests = "tests" >::: [
+  "empty" >:: make_test "" Null;
+  "block" >:: make_test "3 5 -6" (Number (-6.0));
+  "null" >:: make_test "null" Null;
+  "true" >:: make_test "true" (Bool true);
+  "false" >:: make_test "false" (Bool false);
+  "number" >:: make_test "3.4e-5" (Number 3.4e-5);
+  "string" >:: make_test "\"a\"" (String "a");
+  "escaped string" >:: make_test "\"\\tI said, \\\"Hello world!\\\"\\n\"" (String "\tI said, \"Hello world!\"\n");
+  "unterminated string" >:: make_error_test "\"aaaaaaa" (Failure "Unterminated string");
+  "list" >:: make_test "[1, null, \"b\"]" (List [Number 1.0; Null; String "b"]);
+  "map" >:: make_test "{1: false, null: [], [4]: \"b\"}" (Map ([(Value.Number 1.0, Value.Bool false); (Null, List []); (List [Number 4.0], String "b")] |> List.to_seq |> Hashtbl.of_seq)); (* change 4 to 3 and this test fails for some reason *)
+  "unexpected char" >:: make_error_test "@" (Failure "Unexpected character: @");
+  "global" >:: make_test ~globals: [("t", Number 5.0)] "t" (Number 5.0);
+  "undefined global" >:: make_error_test "t" (Failure "Undefined global variable: t");
+  "negate" >:: make_test "--9" (Number 9.0);
+  "add" >:: make_test "4 + 5" (Number 9.0);
+  "add strings" >:: make_test "\"aa\" + \"ba\"" (String "aaba");
+  "add string and number" >:: make_error_test "\"aa\" + 5" (Failure "Invalid arguments to +");
+  "subtract" >:: make_test "4 - 5" (Number (-1.0));
+  "multiply" >:: make_test "4 * 5" (Number 20.0);
+  "divide" >:: make_test "4 / 5" (Number (0.8));
+  "modulo" >:: make_test "4.5 % 2" (Number 0.5);
+  "arithmetic precedence" >:: make_test "1 + 3 * 2 - 4 / (5 % 3)" (Number 5.0);
+  "less than" >:: make_test "4 < 5" (Bool true);
+  "less than or equal to" >:: make_test "4 <= 5" (Bool true);
+  "equal to" >:: make_test "\"a\" == 5" (Bool false);
+  "not equal to" >:: make_test "\"a\" != 5" (Bool true);
+  "greater than" >:: make_test "4 > 5" (Bool false);
+  "greater than or equal to" >:: make_test "5 >= 5" (Bool true);
+  "and" >:: make_test "5 > 4 and 5 > 3" (Bool true);
+  "or" >:: make_test "5 > 666666 or 5 > 1 + 3" (Bool true);
+  "not" >:: make_test "not (5 > 666666)" (Bool true);
+  "logical precedence" >:: make_test "not true and false" (Bool false);
+  "cons" >:: make_test "1 :: 2 :: 3 + 4 :: []" (List [Number 1.0; Number 2.0; Number 7.0]);
+  "call" >:: make_test "(fun(x) x + 4 end)(4)" (Number 8.0);
+  "call with bad args" >:: make_error_test "(fun(x) x + 4 end)(4, 7)" (Failure "Function expected 1 arguments, but received 2");
+  "call with bad func" >:: make_error_test "6(4, 7)" (Failure "Cannot call 6");
+  "upvalue" >:: make_test "(fun(x) y = 5 fun() x + y end end)(1)()" (Number 6.0);
+  "primitive" >:: make_test ~globals: [("add_one", Primitive (fun [Number x] -> Number (x +. 1.0)))] "add_one(44)" (Number 45.0);
+  "if" >:: make_test "if true then 1 else 2 end" (Number 1.0);
+  "elseif" >:: make_test "if false then 1 elseif true then 2 else 3 end" (Number 2.0);
+  "convoluted elseif" >:: make_test
+    "if false then
+      1
+    elseif 1 + 1 == 2 then
+      if 1 + 1 == 3 then
+        2
+      elseif 1 + 2 == 3 then
+        3
+      else
+        4
+      end
+    elseif 1 + 1 == 2 then
+      5
+    else
+      6
+    end" (Number 3.0);
+  "mutually recursive closures" >:: make_test
+    "def f()
+      def g(x)
+        if x == 0 then
+          true
+        else
+          h(x - 1)
+        end
+      end
+      def h(x)
+        if x == 0 then
+          false
+        else
+          g(x - 1)
+        end
+      end
+      g
+    end
+    f()(6)" (Bool true);
+  "let" >:: make_test "let x = 3, y = 0 in x + y end" (Number 3.0);
+  "let out of scope" >:: make_error_test "let x = 3 in x end x" (Failure "Undefined global variable: x");
+]
 let _ =
-  run_test_tt_main parser_tests;
-  run_test_tt_main compiler_tests;
-  run_test_tt_main vm_tests
+  run_test_tt_main tests

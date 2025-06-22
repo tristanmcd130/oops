@@ -8,7 +8,7 @@ and level =
 | Upvalue
 | Local
 
-let make parent = {parent; locals = Hashtbl.create 16; upvalues = Hashtbl.create 16}
+let make parent locals = {parent; locals = List.mapi (fun i n -> (n, i)) locals |> List.to_seq |> Hashtbl.of_seq; upvalues = Hashtbl.create 16}
 let parent scope = scope.parent
 let locals scope = scope.locals
 let upvalues scope = scope.upvalues
@@ -38,12 +38,14 @@ let rec add_upvalue scope name =
     (match scope.parent with
     | None -> failwith (name ^ " must be a global, no upvalues reference it")
     | Some p ->
-      match Hashtbl.find_opt p.locals name with
+      (match Hashtbl.find_opt p.locals name with
       | None ->
         let i = add_upvalue p name in
-        Hashtbl.replace scope.upvalues name (i, Upvalue);
-        i
-      | Some i ->
-        Hashtbl.replace scope.upvalues name (i, Local);
-        i)
+        Hashtbl.replace scope.upvalues name (i, Upvalue)
+      | Some i -> Hashtbl.replace scope.upvalues name (i, Local));
+      Hashtbl.length scope.upvalues - 1)
   | Some (i, _) -> i
+let rec resolve_locals scope = function
+| Ast.Block bs -> List.iter (resolve_locals scope) bs
+| Assign (n, _) -> add_local scope n |> ignore
+| _ -> ()

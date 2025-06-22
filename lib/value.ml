@@ -8,6 +8,7 @@ type 'a t =
 | Function of 'a func
 | Closure of 'a closure
 | Cell of 'a t ref
+| Primitive of ('a t list -> 'a t)
 and 'a func = {
   chunk: 'a;
   num_args: int;
@@ -18,12 +19,6 @@ and 'a closure = {
   upvalues: 'a t ref array;
 }
 
-let make_function chunk num_args num_locals = {chunk; num_args; num_locals}
-let make_closure func upvalues = {func; upvalues}
-let chunk closure = closure.func.chunk
-let num_args closure = closure.func.num_args
-let num_locals closure = closure.func.num_locals
-let get_upvalue closure i = closure.upvalues.(i)
 let rec to_string = function
 | Null -> "null"
 | Bool b -> string_of_bool b
@@ -34,3 +29,4 @@ let rec to_string = function
 | Function f -> "<function with " ^ string_of_int f.num_args ^ " args and " ^ string_of_int f.num_locals ^ " locals>"
 | Closure c -> "<closure>"
 | Cell c -> "<cell containing " ^ to_string !c ^ ">"
+| Primitive p -> "<primitive>"

@@ -12,14 +12,25 @@ type t =
 | Binary of t * binary_op * t
 | Fun of string list * t
 | Call of t * t list
+| If of (t * t) list
 and unary_op =
 | Negate
+| Not
 and binary_op =
 | Add
 | Subtract
 | Multiply
 | Divide
 | Modulo
+| LT
+| LE
+| EQ
+| NE
+| GT
+| GE
+| And
+| Or
+| Cons
 
 let rec to_string = function
 | Block b -> "Block([" ^ (b |> List.map to_string |> String.concat ", ") ^ "])"
@@ -32,12 +43,23 @@ let rec to_string = function
 | Var n -> "Var(" ^ n ^ ")"
 | Assign (n, v) -> "Assign(" ^ n ^ ", " ^ to_string v ^ ")"
 | Unary (o, e) -> "Unary(" ^ (match o with
-  | Negate -> "-") ^ ", " ^ to_string e ^ ")"
+  | Negate -> "-"
+  | Not -> "not") ^ ", " ^ to_string e ^ ")"
 | Binary (e1, o, e2) -> "Binary(" ^ to_string e1 ^ ", " ^ (match o with
   | Add -> "+"
   | Subtract -> "-"
   | Multiply -> "*"
   | Divide -> "/"
-  | Modulo -> "%") ^ ", " ^ to_string e2 ^ ")"
+  | Modulo -> "%"
+  | LT -> "<"
+  | LE -> "<="
+  | EQ -> "=="
+  | NE -> "!="
+  | GT -> ">"
+  | GE -> ">="
+  | And -> "and"
+  | Or -> "or"
+  | Cons -> "::") ^ ", " ^ to_string e2 ^ ")"
 | Fun (ps, b) -> "Fun([" ^ (ps |> String.concat ", ") ^ "], " ^ to_string b ^ ")"
 | Call (f, a) -> "Call(" ^ to_string f ^ ", [" ^ (a |> List.map to_string |> String.concat ", ") ^ "])"
+| If bs -> "If([" ^ (List.map (fun (c, t) -> "(" ^ to_string c ^ ", " ^ to_string t ^ ")") bs |> String.concat ", ") ^ "])"

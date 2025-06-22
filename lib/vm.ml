@@ -18,14 +18,14 @@ let pop vm =
   let value = List.hd (List.hd vm.frames).stack in
   (List.hd vm.frames).stack <- List.tl (List.hd vm.frames).stack;
   value
-let push_frame vm closure args = vm.frames <- {chunk = Value.chunk closure; ip = 0; stack = []; locals = Array.make (closure |> Value.num_locals) Value.Null |> Array.append (Array.of_list args)} :: vm.frames
+let push_frame vm (closure: Chunk.t Value.closure) args = vm.frames <- {chunk = closure.func.chunk; ip = 0; stack = []; locals = Array.make closure.func.num_locals Value.Null |> Array.append (Array.of_list args)} :: vm.frames
 let pop_frame vm =
   let frame = List.hd vm.frames in
   vm.frames <- List.tl vm.frames;
   frame
 let rec call vm closure args =
-  (* closure |> Value.get_chunk |> Chunk.to_string |> print_endline; *)
   push_frame vm closure args;
+  (* closure.func.chunk |> Chunk.to_string |> print_endline; *)
   let top_frame = List.hd vm.frames in
   while top_frame.ip < Chunk.length top_frame.chunk do
     match Chunk.get_opcode top_frame.chunk (let ip = top_frame.ip in top_frame.ip <- top_frame.ip + 1; ip) with
@@ -51,7 +51,7 @@ let rec call vm closure args =
     | Negate ->
       (match pop vm with
       | Number n -> push vm (Number (-.n))
-      | _ -> failwith "Invalid arguments to u-")
+      | _ -> failwith "Invalid argument to u-")
     | Add ->
       let r = pop vm in
       (match (pop vm, r) with
@@ -78,8 +78,59 @@ let rec call vm closure args =
       (match (pop vm, r) with
       | (Number n, Number n') -> push vm (Number (mod_float n n'))
       | _ -> failwith "Invalid arguments to %")
-    | GetLocal i -> push vm top_frame.locals.(i)
-    | SetLocal i -> pop vm |> Array.set top_frame.locals i
+    | LT ->
+      let r = pop vm in
+      (match (pop vm, r) with
+      | (Number n, Number n') -> push vm (Bool (n < n'))
+      | _ -> failwith "Invalid arguments to <")
+    | LE ->
+      let r = pop vm in
+      (match (pop vm, r) with
+      | (Number n, Number n') -> push vm (Bool (n <= n'))
+      | _ -> failwith "Invalid arguments to <=")
+    | EQ ->
+      let r = pop vm in
+      push vm (Bool (pop vm = r))
+    | NE ->
+      let r = pop vm in
+      push vm (Bool (pop vm <> r))
+    | GT ->
+      let r = pop vm in
+      (match (pop vm, r) with
+      | (Number n, Number n') -> push vm (Bool (n > n'))
+      | _ -> failwith "Invalid arguments to >")
+    | GE ->
+      let r = pop vm in
+      (match (pop vm, r) with
+      | (Number n, Number n') -> push vm (Bool (n >= n'))
+      | _ -> failwith "Invalid arguments to >=")
+    | And ->
+      let r = pop vm in
+      (match (pop vm, r) with
+      | (Bool b, Bool b') -> push vm (Bool (b && b'))
+      | _ -> failwith "Invalid arguments to and")
+    | Or ->
+      let r = pop vm in
+      (match (pop vm, r) with
+      | (Bool b, Bool b') -> push vm (Bool (b || b'))
+      | _ -> failwith "Invalid arguments to or")
+    | Not ->
+      (match pop vm with
+      | Bool b -> push vm (Bool (not b))
+      | _ -> failwith "Invalid argument to not")
+    | Cons ->
+      let r = pop vm in
+      (match (pop vm, r) with
+      | (x, List xs) -> push vm (List (x :: xs))
+      | _ -> failwith "Invalid arguments to ::")
+    | GetLocal i ->
+      (match top_frame.locals.(i) with
+      | Cell c -> push vm !c
+      | x -> push vm x)
+    | SetLocal i ->
+      (match top_frame.locals.(i) with
+      | Cell c -> c := pop vm
+      | _ -> top_frame.locals.(i) <- pop vm)
     | Call i ->
       let func = pop vm in
       let args' = ref [] in
@@ -88,13 +139,16 @@ let rec call vm closure args =
       done;
       (match func with
       | Closure c ->
-        if i = Value.num_args c then
+        if i = c.func.num_args then
           call vm c !args' |> push vm
         else
-          failwith ("Function expected " ^ string_of_int (Value.num_args c) ^ " arguments, but received " ^ string_of_int i)
+          failwith ("Function expected " ^ string_of_int c.func.num_args ^ " arguments, but received " ^ string_of_int i)
+      | Primitive p -> p !args' |> push vm
       | x -> failwith ("Cannot call " ^ Value.to_string x))
     | MakeCell i ->
-      top_frame.locals.(i) <- Cell (ref top_frame.locals.(i));
+      (match top_frame.locals.(i) with
+      | Cell _ -> ()
+      | _ -> top_frame.locals.(i) <- Cell (ref top_frame.locals.(i)));
       push vm top_frame.locals.(i)
     | MakeClosure i ->
       let func = (match pop vm with Function f -> f | _ -> failwith "Cannot make a closure out of this") in
@@ -102,9 +156,15 @@ let rec call vm closure args =
       for j = 1 to i do
         upvalues := (match pop vm with Cell c -> c | _ -> failwith "This upvalue should be a cell") :: !upvalues
       done;
-      push vm (Closure (!upvalues |> Array.of_list |> Value.make_closure func))
-    | GetUpvalue i -> Cell (Value.get_upvalue closure i) |> push vm
-    | DerefUpvalue i -> !(Value.get_upvalue closure i) |> push vm
+      push vm (Closure {func; upvalues = Array.of_list !upvalues})
+    | GetUpvalue i -> Cell closure.upvalues.(i) |> push vm
+    | DerefUpvalue i -> !(closure.upvalues.(i)) |> push vm
+    | Jump i -> top_frame.ip <- i
+    | JumpIfFalse i ->
+      (match pop vm with
+      | Null | Bool false | Number 0.0 | String "" | List [] -> top_frame.ip <- i
+      | Map m when Hashtbl.length m = 0 -> top_frame.ip <- i
+      | _ -> ())
   done;
   match (pop_frame vm).stack with
   | [] -> Value.Null

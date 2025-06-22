@@ -10,6 +10,16 @@ type t =
 | Multiply
 | Divide
 | Modulo
+| LT
+| LE
+| EQ
+| NE
+| GT
+| GE
+| And
+| Or
+| Not
+| Cons
 | GetLocal of int
 | SetLocal of int
 | Call of int
@@ -17,5 +27,7 @@ type t =
 | MakeClosure of int
 | GetUpvalue of int
 | DerefUpvalue of int
+| Jump of int
+| JumpIfFalse of int
 
 val to_string: t -> string

@@ -3,7 +3,7 @@ open Oops
 let vm = Vm.make ([] |> List.to_seq |> Hashtbl.of_seq)
 let run_from_channel channel =
   let chunk = Chunk.empty () in
-  channel |> Lexing.from_channel |> Parser.program Lexer.read |> Chunk.compile chunk (Scope.make None);
+  channel |> Lexing.from_channel |> Parser.program Lexer.read |> Chunk.compile chunk (Scope.make None []);
   Vm.call vm (Chunk.to_closure chunk) []
 let rec repl line_num =
   Printf.printf "%d> " line_num;

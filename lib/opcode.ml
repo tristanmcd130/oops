@@ -10,6 +10,16 @@ type t =
 | Multiply
 | Divide
 | Modulo
+| LT
+| LE
+| EQ
+| NE
+| GT
+| GE
+| And
+| Or
+| Not
+| Cons
 | GetLocal of int
 | SetLocal of int
 | Call of int
@@ -17,6 +27,8 @@ type t =
 | MakeClosure of int
 | GetUpvalue of int
 | DerefUpvalue of int
+| Jump of int
+| JumpIfFalse of int
 
 let to_string = function
 | GetConstant i -> "get_constant " ^ string_of_int i
@@ -30,6 +42,16 @@ let to_string = function
 | Multiply -> "multiply"
 | Divide -> "divide"
 | Modulo -> "modulo"
+| LT -> "lt"
+| LE -> "le"
+| EQ -> "eq"
+| NE -> "ne"
+| GT -> "gt"
+| GE -> "ge"
+| And -> "and"
+| Or -> "or"
+| Not -> "not"
+| Cons -> "cons"
 | GetLocal i -> "get_local " ^ string_of_int i
 | SetLocal i -> "set_local " ^ string_of_int i
 | Call i -> "call " ^ string_of_int i
@@ -37,3 +59,5 @@ let to_string = function
 | MakeClosure i -> "make_closure " ^ string_of_int i
 | GetUpvalue i -> "get_upvalue " ^ string_of_int i
 | DerefUpvalue i -> "deref_upvalue " ^ string_of_int i
+| Jump i -> "jump " ^ string_of_int i
+| JumpIfFalse i -> "jump_if_false " ^ string_of_int i

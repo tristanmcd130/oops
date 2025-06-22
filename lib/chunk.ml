@@ -62,7 +62,8 @@ let rec compile chunk scope = function
 | Unary (o, e) ->
   compile chunk scope e;
   add_opcode chunk (match o with
-  | Negate -> Negate) |> ignore
+  | Negate -> Negate
+  | Not -> Not) |> ignore
 | Binary (e1, o, e2) ->
   compile chunk scope e1;
   compile chunk scope e2;
@@ -71,25 +72,49 @@ let rec compile chunk scope = function
   | Subtract -> Subtract
   | Multiply -> Multiply
   | Divide -> Divide
-  | Modulo -> Modulo) |> ignore
+  | Modulo -> Modulo
+  | LT -> LT
+  | LE -> LE
+  | EQ -> EQ
+  | NE -> NE
+  | GT -> GT
+  | GE -> GE
+  | And -> And
+  | Or -> Or
+  | Cons -> Cons) |> ignore
 | Fun (ps, b) ->
   let c = empty () in
-  let s = Scope.make (Some scope) in
-  List.iter (fun x -> Scope.add_local s x |> ignore) ps;
+  let s = Scope.make (Some scope) ps in
+  Scope.resolve_locals s b;
   compile c s b;
   Scope.upvalues s |> Hashtbl.iter (fun n (i, l) ->
     match l with
     | Scope.Upvalue -> add_opcode chunk (GetUpvalue i) |> ignore
     | Local -> add_opcode chunk (MakeCell i) |> ignore
     | _ -> ());
-  add_opcode chunk (GetConstant (Function ((Scope.locals s |> Hashtbl.length) - List.length ps |> Value.make_function c (List.length ps)) |> add_constant chunk)) |> ignore;
+  add_opcode chunk (GetConstant (Function {chunk = c; num_args = List.length ps; num_locals = Hashtbl.length (Scope.locals s) - List.length ps} |> add_constant chunk)) |> ignore;
   add_opcode chunk (MakeClosure (Scope.upvalues s |> Hashtbl.length)) |> ignore
 | Call (f, a) ->
   List.iter (compile chunk scope) a;
   compile chunk scope f;
   add_opcode chunk (Call (List.length a)) |> ignore
-let to_closure chunk = Value.make_closure (Value.make_function chunk 0 0) [||]
+| If bs ->
+  let rec compile_if branches =
+    (match branches with
+    | [] -> failwith "Empty if"
+    | (Ast.Bool true, t) :: _ -> compile chunk scope t
+    | (c, t) :: bs' ->
+      compile chunk scope c;
+      let j = add_opcode chunk (JumpIfFalse 999) in
+      compile chunk scope t;
+      let j2 = add_opcode chunk (Jump 999) in
+      let e = compile_if bs' in
+      chunk.code.(j) <- JumpIfFalse (j2 + 1);
+      chunk.code.(j2) <- Jump e);
+    length chunk in
+  compile_if bs |> ignore
+let to_closure chunk: t Value.closure = {func = {chunk; num_args = 0; num_locals = 0}; upvalues = [||]}
 let rec to_string chunk =
   "Code:\n" ^ (Array.mapi (fun i x -> string_of_int i ^ ": " ^ Opcode.to_string x) chunk.code |> Array.to_list |> String.concat "\n")
-  ^ "\n\nConstants:\n" ^ (Array.mapi (fun i x -> string_of_int i ^ ": " ^ Value.to_string x ^ (match x with Function f -> " (" ^ (Value.make_closure f [||] |> Value.chunk |> to_string) ^ ")" | _ -> "")) chunk.constants |> Array.to_list |> String.concat "\n")
+  ^ "\n\nConstants:\n" ^ (Array.mapi (fun i x -> string_of_int i ^ ": " ^ Value.to_string x ^ (match x with Function f -> " (" ^ to_string f.chunk ^ ")" | _ -> "")) chunk.constants |> Array.to_list |> String.concat "\n")
   ^ "\n\nNames:\n" ^ (Array.mapi (fun i x -> string_of_int i ^ ": " ^ x) chunk.names |> Array.to_list |> String.concat "\n")
