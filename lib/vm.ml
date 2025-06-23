@@ -24,54 +24,6 @@ let pop_frame vm =
   vm.frames <- List.tl vm.frames;
   frame
 let subset a b = List.for_all (fun x -> List.mem x b) a
-
-(* TODO: figure out how to get this stuff into value.ml *)
-let null_type: Chunk.t Value.typ = {name = "Null"; fields = []; methods = Hashtbl.create 16; traits = []}
-let bool_type: Chunk.t Value.typ = {name = "Bool"; fields = []; methods = Hashtbl.create 16; traits = []}
-let number_type: Chunk.t Value.typ = {name = "Number"; fields = []; methods = Hashtbl.create 16; traits = []}
-let string_type: Chunk.t Value.typ = {name = "String"; fields = []; methods = Hashtbl.create 16; traits = []}
-let list_type: Chunk.t Value.typ = {name = "List"; fields = []; methods = Hashtbl.create 16; traits = []}
-let map_type: Chunk.t Value.typ = {name = "Map"; fields = []; methods = Hashtbl.create 16; traits = []}
-let function_type: Chunk.t Value.typ = {name = "Function"; fields = []; methods = Hashtbl.create 16; traits = []}
-let type_type: Chunk.t Value.typ = {name = "Type"; fields = []; methods = Hashtbl.create 16; traits = []}
-let trait_type: Chunk.t Value.typ = {name = "Trait"; fields = []; methods = Hashtbl.create 16; traits = []}
-let rec type_of = function
-| Value.Null -> null_type
-| Bool _ -> bool_type
-| Number _ -> number_type
-| String _ -> string_type
-| List _ -> list_type
-| Map _ -> map_type
-| Closure _ | Primitive _ | Method _ -> function_type
-| Cell c -> type_of !c
-| Struct (t, _) -> t
-| Type _ -> type_type
-| Trait _ -> trait_type
-let bind_self self = function
-| Value.Closure c -> Value.Method {closure = c; self}
-| Primitive (n, p) -> Primitive (n, fun args -> p (self :: args))
-| x -> failwith ("Cannot bind self in " ^ Value.to_string x)
-let rec get_method_from_traits (obj: Chunk.t Value.t) (name: string): Chunk.t Value.trait list -> Chunk.t Value.t option = function
-| [] -> None
-| t :: ts ->
-  match Hashtbl.find_opt t.provides name with
-  | None -> get_method_from_traits obj name ts
-  | Some m -> Some m
-let get_method obj name =
-  (match Hashtbl.find_opt (type_of obj).methods name with
-  | None ->
-    (match get_method_from_traits obj name (type_of obj).traits with
-    | None -> failwith ((type_of obj).name ^ " has no field/method " ^ name)
-    | Some m -> m)
-  | Some m -> m) |> bind_self obj
-let dot obj name =
-  match obj with
-  | Value.Struct (_, fs) ->
-    (match Hashtbl.find_opt fs name with
-    | None -> get_method obj name
-    | Some f -> f)
-  | _ -> get_method obj name
-
 let rec call vm closure args =
   push_frame vm closure args;
   (* closure.func.chunk |> Chunk.to_string |> print_endline; *)
@@ -97,81 +49,6 @@ let rec call vm closure args =
       | None -> failwith ("Undefined global variable " ^ Chunk.get_name top_frame.chunk i)
       | Some v -> push vm v)
     | SetGlobal i -> pop vm |> Hashtbl.replace vm.globals (Chunk.get_name top_frame.chunk i)
-    | Negate ->
-      (match pop vm with
-      | Number n -> push vm (Number (-.n))
-      | _ -> failwith "Invalid argument to u-")
-    | Add ->
-      let r = pop vm in
-      (match (pop vm, r) with
-      | (Number n, Number n') -> push vm (Number (n +. n'))
-      | (String s, String s') -> push vm (String (s ^ s'))
-      | _ -> failwith "Invalid arguments to +")
-    | Subtract ->
-      let r = pop vm in
-      (match (pop vm, r) with
-      | (Number n, Number n') -> push vm (Number (n -. n'))
-      | _ -> failwith "Invalid arguments to -")
-    | Multiply ->
-      let r = pop vm in
-      (match (pop vm, r) with
-      | (Number n, Number n') -> push vm (Number (n *. n'))
-      | _ -> failwith "Invalid arguments to *")
-    | Divide ->
-      let r = pop vm in
-      (match (pop vm, r) with
-      | (Number n, Number n') -> push vm (Number (n /. n'))
-      | _ -> failwith "Invalid arguments to /")
-    | Modulo ->
-      let r = pop vm in
-      (match (pop vm, r) with
-      | (Number n, Number n') -> push vm (Number (mod_float n n'))
-      | _ -> failwith "Invalid arguments to %")
-    | LT ->
-      let r = pop vm in
-      (match (pop vm, r) with
-      | (Number n, Number n') -> push vm (Bool (n < n'))
-      | _ -> failwith "Invalid arguments to <")
-    | LE ->
-      let r = pop vm in
-      (match (pop vm, r) with
-      | (Number n, Number n') -> push vm (Bool (n <= n'))
-      | _ -> failwith "Invalid arguments to <=")
-    | EQ ->
-      let r = pop vm in
-      push vm (Bool (pop vm = r))
-    | NE ->
-      let r = pop vm in
-      push vm (Bool (pop vm <> r))
-    | GT ->
-      let r = pop vm in
-      (match (pop vm, r) with
-      | (Number n, Number n') -> push vm (Bool (n > n'))
-      | _ -> failwith "Invalid arguments to >")
-    | GE ->
-      let r = pop vm in
-      (match (pop vm, r) with
-      | (Number n, Number n') -> push vm (Bool (n >= n'))
-      | _ -> failwith "Invalid arguments to >=")
-    | And ->
-      let r = pop vm in
-      (match (pop vm, r) with
-      | (Bool b, Bool b') -> push vm (Bool (b && b'))
-      | _ -> failwith "Invalid arguments to and")
-    | Or ->
-      let r = pop vm in
-      (match (pop vm, r) with
-      | (Bool b, Bool b') -> push vm (Bool (b || b'))
-      | _ -> failwith "Invalid arguments to or")
-    | Not ->
-      (match pop vm with
-      | Bool b -> push vm (Bool (not b))
-      | _ -> failwith "Invalid argument to not")
-    | Cons ->
-      let r = pop vm in
-      (match (pop vm, r) with
-      | (x, List xs) -> push vm (List (x :: xs))
-      | _ -> failwith "Invalid arguments to ::")
     | GetLocal i ->
       (match top_frame.locals.(i) with
       | Cell c -> push vm !c
@@ -192,14 +69,14 @@ let rec call vm closure args =
           if List.length args' = c.num_args then
             call vm c args' |> push vm
           else
-            failwith ("Function " ^ c.name ^ " expected " ^ string_of_int c.num_args ^ " arguments, but received " ^ string_of_int i)
-        | Primitive (_, p) -> p args' |> push vm
+            failwith (Value.to_string (Closure c) ^ " expected " ^ string_of_int c.num_args ^ " arguments, but received " ^ string_of_int i)
+        | Primitive p -> p args' |> push vm
         | Type t ->
-          if List.length args' = List.length t.fields then
-            Struct (t, List.combine t.fields args' |> List.to_seq |> Hashtbl.of_seq) |> push vm
+          if List.length args' = Hashtbl.length t.fields then
+            Struct (t, args' |> Array.of_list) |> push vm
           else
-            failwith (t.name ^ "'s constructor expected " ^ string_of_int (List.length t.fields) ^ " arguments, but received " ^ string_of_int i)
-        | Method m -> call_helper (Closure m.closure) (m.self :: args')
+            failwith ("Constructor for " ^ Value.to_string (Type t) ^ " expected " ^ string_of_int (Hashtbl.length t.fields) ^ " arguments, but received " ^ string_of_int i)
+        | Method (s, c) -> call_helper (Closure c) (s :: args')
         | x -> failwith ("Cannot call " ^ Value.to_string x) in
       call_helper f !a
     | MakeCell i ->
@@ -222,7 +99,7 @@ let rec call vm closure args =
       | Null | Bool false | Number 0.0 | String "" | List [] -> top_frame.ip <- i
       | Map m when Hashtbl.length m = 0 -> top_frame.ip <- i
       | _ -> ())
-    | Dot i -> Chunk.get_name top_frame.chunk i |> dot (pop vm) |> push vm
+    | Dot i -> Chunk.get_name top_frame.chunk i |> Chunk.dot (pop vm) |> push vm
     | AddMethod i ->
       let m = pop vm in
       Hashtbl.replace (match List.hd top_frame.stack with
@@ -237,11 +114,11 @@ let rec call vm closure args =
           (if subset t'.requires (ty'.methods |> Hashtbl.to_seq_keys |> List.of_seq) then
             ty'.traits <- t' :: ty'.traits
           else
-            failwith (ty'.name ^ " does not fully implement " ^ t'.name ^ ": missing " ^ String.concat ", " (List.filter (fun x -> not (ty'.methods |> Hashtbl.to_seq_keys |> List.of_seq |> List.mem x)) t'.requires)))
+            failwith (Value.to_string (Type ty') ^ " does not fully implement " ^ Value.to_string (Trait t') ^ ": missing " ^ String.concat ", " (List.filter (fun x -> not (ty'.methods |> Hashtbl.to_seq_keys |> List.of_seq |> List.mem x)) t'.requires)))
       | (Trait _, x) -> failwith ("Cannot implement for " ^ Value.to_string x ^ ": it is not a type")
       | (x, Type _) -> failwith ("Cannot implement " ^ Value.to_string x ^ ": it is not a trait")
       | _ -> failwith "How did you even get here?")
-    | Pop -> pop vm |> ignore
+    | BaseTrait -> push vm (Trait Chunk.base_trait)
   done;
   match (pop_frame vm).stack with
   | [] -> Value.Null

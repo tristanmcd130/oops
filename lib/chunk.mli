@@ -1,5 +1,8 @@
 type t
 
+val dot: t Value.t -> string -> t Value.t
+val base_trait: t Value.trait
+
 val make: Opcode.t array -> t Value.t array -> string array -> t
 val empty: unit -> t
 val get_opcode: t -> int -> Opcode.t

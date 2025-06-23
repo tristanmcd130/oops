@@ -4,22 +4,6 @@ type t =
 | MakeMap of int
 | GetGlobal of int
 | SetGlobal of int
-| Negate
-| Add
-| Subtract
-| Multiply
-| Divide
-| Modulo
-| LT
-| LE
-| EQ
-| NE
-| GT
-| GE
-| And
-| Or
-| Not
-| Cons
 | GetLocal of int
 | SetLocal of int
 | Call of int
@@ -32,7 +16,7 @@ type t =
 | Dot of int
 | AddMethod of int
 | Impl
-| Pop
+| BaseTrait
 
 let to_string = function
 | GetConstant i -> "get_constant " ^ string_of_int i
@@ -40,22 +24,6 @@ let to_string = function
 | MakeMap i -> "make_map " ^ string_of_int i
 | GetGlobal i -> "get_global " ^ string_of_int i
 | SetGlobal i -> "set_global " ^ string_of_int i
-| Negate -> "negate"
-| Add -> "add"
-| Subtract -> "subtract"
-| Multiply -> "multiply"
-| Divide -> "divide"
-| Modulo -> "modulo"
-| LT -> "lt"
-| LE -> "le"
-| EQ -> "eq"
-| NE -> "ne"
-| GT -> "gt"
-| GE -> "ge"
-| And -> "and"
-| Or -> "or"
-| Not -> "not"
-| Cons -> "cons"
 | GetLocal i -> "get_local " ^ string_of_int i
 | SetLocal i -> "set_local " ^ string_of_int i
 | Call i -> "call " ^ string_of_int i
@@ -68,4 +36,4 @@ let to_string = function
 | Dot i -> "dot " ^ string_of_int i
 | AddMethod i -> "add_method " ^ string_of_int i
 | Impl -> "impl"
-| Pop -> "pop"
+| BaseTrait -> "base_trait"

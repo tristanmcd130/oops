@@ -4,22 +4,6 @@ type t =
 | MakeMap of int
 | GetGlobal of int
 | SetGlobal of int
-| Negate
-| Add
-| Subtract
-| Multiply
-| Divide
-| Modulo
-| LT
-| LE
-| EQ
-| NE
-| GT
-| GE
-| And
-| Or
-| Not
-| Cons
 | GetLocal of int
 | SetLocal of int
 | Call of int
@@ -32,6 +16,6 @@ type t =
 | Dot of int
 | AddMethod of int
 | Impl
-| Pop
+| BaseTrait
 
 val to_string: t -> string

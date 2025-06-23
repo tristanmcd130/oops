@@ -69,7 +69,26 @@ stmt:
 
 assign: n = ID; EQUAL; v = exp	{(n, v)}
 
-def: DEF; n = ID; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{(n, ps, b)}
+def: DEF; n = fun_id; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{(n, ps, b)}
+
+fun_id:
+	| MINUS		{"u-"}
+	| NOT		{"not"}
+	| PLUS		{"+"}
+	| MINUS		{"-"}
+	| STAR		{"*"}
+	| SLASH		{"/"}
+	| PERCENT	{"%"}
+	| LT		{"<"}
+	| LE		{"<="}
+	| EQ		{"=="}
+	| NE		{"!="}
+	| GT		{">"}
+	| GE		{">="}
+	| AND		{"and"}
+	| OR		{"or"}
+	| CONS		{"::"}
+	| n = ID	{n}
 
 exp:
 	| NULL																	{Ast.Null}
@@ -79,8 +98,8 @@ exp:
 	| LBRACKET; l = separated_list(COMMA, exp); RBRACKET					{List l}
 	| LBRACE; m = separated_list(COMMA, map_entry); RBRACE					{Map m}
 	| n = ID																{Var n}
-	| o = unary_op; e = exp													{Unary (o, e)}
-	| e1 = exp; o = binary_op; e2 = exp										{Binary (e1, o, e2)}
+	| o = unary_op; e = exp													{Call (Dot (e, o), [])}
+	| e1 = exp; o = binary_op; e2 = exp										{match o with "::" -> Call (Dot (e2, o), [e1]) | _ -> Call (Dot (e1, o), [e2])}
 	| FUN; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{Fun ("", ps, b)}
 	| f = exp; LPAREN; a = separated_list(COMMA, exp); RPAREN				{Call (f, a)}
 	| IF; c = exp; THEN; t = block; es = elseif*; e = else_; END			{If ((c, t) :: es @ [e])}
@@ -91,24 +110,24 @@ exp:
 map_entry: k = exp; COLON; v = exp	{(k, v)}
 
 %inline unary_op:
-	| MINUS	{Ast.Negate}
-	| NOT	{Ast.Not}
+	| MINUS	{"u-"}
+	| NOT	{"not"}
 
 %inline binary_op:
-	| MINUS		{Ast.Subtract}
-	| STAR		{Ast.Multiply}
-	| SLASH		{Ast.Divide}
-	| PERCENT	{Ast.Modulo}
-	| LT		{Ast.LT}
-	| LE		{Ast.LE}
-	| EQ		{Ast.EQ}
-	| NE		{Ast.NE}
-	| GT		{Ast.GT}
-	| GE		{Ast.GE}
-	| AND		{Ast.And}
-	| OR		{Ast.Or}
-	| PLUS		{Ast.Add}
-	| CONS		{Ast.Cons}
+	| PLUS		{"+"}
+	| MINUS		{"-"}
+	| STAR		{"*"}
+	| SLASH		{"/"}
+	| PERCENT	{"%"}
+	| LT		{"<"}
+	| LE		{"<="}
+	| EQ		{"=="}
+	| NE		{"!="}
+	| GT		{">"}
+	| GE		{">="}
+	| AND		{"and"}
+	| OR		{"or"}
+	| CONS		{"::"}
 
 elseif: ELSEIF; t = exp; THEN; b = block	{(t, b)}
 

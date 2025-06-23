@@ -4,6 +4,76 @@ type t = {
   mutable names: string array;
 }
 
+(* TODO: figure out how to get this stuff into value.ml *)
+let base_trait: t Value.trait = {name = "Base"; requires = []; provides = [
+  ("==", Value.Primitive (fun [self; other] -> Bool (self = other)));
+  ("!=", Primitive (fun [self; other] -> Bool (self <> other)));
+  ("to_string", Primitive (fun [self] -> String (Value.to_string self)));
+] |> List.to_seq |> Hashtbl.of_seq}
+let null_type: t Value.typ = {name = "Null"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let bool_type: t Value.typ = {name = "Bool"; fields = Hashtbl.create 0; methods = [
+  ("not", Value.Primitive (fun [Bool self] -> Bool (not self)));
+  ("and", Primitive (fun [Bool self; Bool other] -> Bool (self && other)));
+  ("or", Primitive (fun [Bool self; Bool other] -> Bool (self || other)));
+] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let number_type: t Value.typ = {name = "Number"; fields = Hashtbl.create 0; methods = [
+  ("u-", Value.Primitive (fun [Number self] -> Number (-.self)));
+  ("+", Primitive (fun [Number self; Number other] -> Number (self +. other)));
+  ("-", Primitive (fun [Number self; Number other] -> Number (self -. other)));
+  ("*", Primitive (fun [Number self; Number other] -> Number (self *. other)));
+  ("/", Primitive (fun [Number self; Number other] -> Number (self /. other)));
+  ("%", Primitive (fun [Number self; Number other] -> Number (mod_float self other)));
+  ("<", Primitive (fun [Number self; Number other] -> Bool (self < other)));
+  ("<=", Primitive (fun [Number self; Number other] -> Bool (self <= other)));
+  (">", Primitive (fun [Number self; Number other] -> Bool (self > other)));
+  (">=", Primitive (fun [Number self; Number other] -> Bool (self >= other)));
+] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let string_type: t Value.typ = {name = "String"; fields = Hashtbl.create 0; methods = [
+  ("+", Value.Primitive (fun [String self; String other] -> String (self ^ other)));
+] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let list_type: t Value.typ = {name = "List"; fields = Hashtbl.create 0; methods = [
+  ("::", Value.Primitive (fun [List self; other] -> List (other :: self)));] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let map_type: t Value.typ = {name = "Map"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let function_type: t Value.typ = {name = "Function"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let type_type: t Value.typ = {name = "Type"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let trait_type: t Value.typ = {name = "Trait"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let rec type_of = function
+| Value.Null -> null_type
+| Bool _ -> bool_type
+| Number _ -> number_type
+| String _ -> string_type
+| List _ -> list_type
+| Map _ -> map_type
+| Closure _ | Primitive _ | Method _ -> function_type
+| Cell c -> type_of !c
+| Struct (t, _) -> t
+| Type _ -> type_type
+| Trait _ -> trait_type
+let bind_self self = function
+| Value.Closure c -> Value.Method (self, c)
+| Primitive p -> Primitive (fun args -> p (self :: args))
+| x -> failwith ("Cannot bind self in " ^ Value.to_string x)
+let rec get_method_from_traits (obj: t Value.t) (name: string): t Value.trait list -> t Value.t option = function
+| [] -> None
+| t :: ts ->
+  match Hashtbl.find_opt t.provides name with
+  | None -> get_method_from_traits obj name ts
+  | Some m -> Some m
+let get_method obj name =
+  (match Hashtbl.find_opt (type_of obj).methods name with
+  | None ->
+    (match get_method_from_traits obj name (type_of obj).traits with
+    | None -> failwith (Value.to_string (Type (type_of obj)) ^ " has no field/method " ^ name)
+    | Some m -> m)
+  | Some m -> m) |> bind_self obj
+let dot obj name =
+  match obj with
+  | Value.Struct (t, fs) ->
+    (match Hashtbl.find_opt t.fields name with
+    | None -> get_method obj name
+    | Some i -> fs.(i))
+  | _ -> get_method obj name
+
 let make code constants names = {code; constants; names}
 let empty () = make [||] [||] [||]
 let rec find_first value = function
@@ -59,29 +129,6 @@ let rec compile chunk scope = function
   (match Scope.parent scope with
   | None -> add_opcode chunk (SetGlobal (add_name chunk n))
   | Some _ -> add_opcode chunk (SetLocal (Scope.add_local scope n))) |> ignore
-| Unary (o, e) ->
-  compile chunk scope e;
-  add_opcode chunk (match o with
-  | Negate -> Negate
-  | Not -> Not) |> ignore
-| Binary (e1, o, e2) ->
-  compile chunk scope e1;
-  compile chunk scope e2;
-  add_opcode chunk (match o with
-  | Add -> Add
-  | Subtract -> Subtract
-  | Multiply -> Multiply
-  | Divide -> Divide
-  | Modulo -> Modulo
-  | LT -> LT
-  | LE -> LE
-  | EQ -> EQ
-  | NE -> NE
-  | GT -> GT
-  | GE -> GE
-  | And -> And
-  | Or -> Or
-  | Cons -> Cons) |> ignore
 | Fun (n, ps, b) ->
   let c = empty () in
   let s = Scope.make (Some scope) ps in
@@ -114,7 +161,7 @@ let rec compile chunk scope = function
       chunk.code.(j2) <- Jump e);
     length chunk in
   compile_if bs |> ignore
-| Struct (n, fs) -> add_opcode chunk (GetConstant (add_constant chunk (Type {name = n; fields = fs; methods = Hashtbl.create 16; traits = []}))) |> ignore
+| Struct (n, fs) -> add_opcode chunk (GetConstant (add_constant chunk (Type {name = n; fields = fs |> List.mapi (fun i n -> (n, i)) |> List.to_seq |> Hashtbl.of_seq; methods = Hashtbl.create 16; traits = [base_trait]}))) |> ignore
 | Dot (e, f) ->
   compile chunk scope e;
   add_opcode chunk (Dot (add_name chunk f)) |> ignore
@@ -122,10 +169,9 @@ let rec compile chunk scope = function
   compile chunk scope ty;
   List.iter (fun (n, ps, b) -> compile chunk scope (Fun (n, "self" :: ps, b)); add_opcode chunk (AddMethod (add_name chunk n)) |> ignore) ms;
   (match t with
-  | None -> add_opcode chunk Pop
-  | Some t' ->
-    compile chunk scope t';
-    add_opcode chunk Impl) |> ignore
+  | None -> add_opcode chunk BaseTrait |> ignore
+  | Some t' -> compile chunk scope t');
+  add_opcode chunk Impl |> ignore
 | Trait (n, rs, ps) ->
   add_opcode chunk (GetConstant (add_constant chunk (Trait {name = n; requires = rs; provides = Hashtbl.create 16}))) |> ignore;
   List.iter (fun (n', ps, b) -> compile chunk scope (Fun (n', "self" :: ps, b)); add_opcode chunk (AddMethod (add_name chunk n')) |> ignore) ps

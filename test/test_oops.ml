@@ -127,11 +127,12 @@ let tests = "tests" >::: [
   "logical precedence" >:: make_test "not true and false" (Bool false);
   "cons" >:: make_test "1 :: 2 :: 3 + 4 :: []" (List [Number 1.0; Number 2.0; Number 7.0]);
   "call" >:: make_test "(fun(x) x + 4 end)(4)" (Number 8.0);
-  "call with bad args" >:: make_error_test "(fun(x) x + 4 end)(4, 7)" (Failure "Function  expected 1 arguments, but received 2");
+  "call with bad args" >:: make_error_test "(fun(x) x + 4 end)(4, 7)" (Failure "<anonymous function> expected 1 arguments, but received 2");
   "call with bad func" >:: make_error_test "6(4, 7)" (Failure "Cannot call 6");
   "upvalue" >:: make_test "(fun(x) y = 5 fun() x + y end end)(1)()" (Number 6.0);
-  "primitive" >:: make_test ~globals: [("add_one", Primitive ("add_one", fun [Number x] -> Number (x +. 1.0)))] "add_one(44)" (Number 45.0);
+  "primitive" >:: make_test ~globals: [("add_one", Primitive (fun [Number x] -> Number (x +. 1.0)))] "add_one(44)" (Number 45.0);
   "if" >:: make_test "if true then 1 else 2 end" (Number 1.0);
+  "if with no else" >:: make_test "if false then 1 end" Null;
   "elseif" >:: make_test "if false then 1 elseif true then 2 else 3 end" (Number 2.0);
   "convoluted elseif" >:: make_test
     "if false then
@@ -170,14 +171,14 @@ let tests = "tests" >::: [
     f()(6)" (Bool true);
   "let" >:: make_test "let x = 3, y = 0 in x + y end" (Number 3.0);
   "let out of scope" >:: make_error_test "let x = 3 in x end x" (Failure "Undefined global variable x");
-  "struct" >:: make_test "struct A a b end A(5, 6)" (Struct ({name = "A"; fields = ["a"; "b"]; methods = Hashtbl.create 16; traits = []}, [("a", Value.Number 5.0); ("b", Number 6.0)] |> List.to_seq |> Hashtbl.of_seq));
-  "struct with bad args" >:: make_error_test "struct A a b end A(56)" (Failure "A's constructor expected 2 arguments, but received 1");
+  "struct" >:: make_test "struct A a b end" Null;
+  "struct with bad args" >:: make_error_test "struct A a b end A(56)" (Failure "Constructor for <type A> expected 2 arguments, but received 1");
   "dot" >:: make_test "struct A a b end A(5, 6).b" (Number 6.0);
-  "dot nonexistent field" >:: make_error_test "struct A a b end A(5, 6).c" (Failure "A has no field/method c");
+  "dot nonexistent field" >:: make_error_test "struct A a b end A(5, 6).c" (Failure "<type A> has no field/method c");
   "impl for" >:: make_test "struct A a b end impl for A def f() self.a + self.b end end A(5, 6).f()" (Number 11.0);
-  "bound primitive" >:: make_test ~globals: [("A", Type {name = "A"; fields = ["a"; "b"]; methods = [("f", Value.Primitive ("f", fun [Struct (_, fs); Number x] ->
-    let Number a = Hashtbl.find fs "a" in
-    let Number b = Hashtbl.find fs "b" in
+  "bound primitive" >:: make_test ~globals: [("A", Type {name = "A"; fields = [("a", 0); ("b", 1)] |> List.to_seq |> Hashtbl.of_seq; methods = [("f", Value.Primitive (fun [self; Number x] ->
+    let Number a = Chunk.dot self "a" in
+    let Number b = Chunk.dot self "b" in
     Number (a +. b +. x)))] |> List.to_seq |> Hashtbl.of_seq; traits = []})] "f = A(2, 4).f f(7)" (Number 13.0);
   "impl" >:: make_test
     "trait T
@@ -216,7 +217,7 @@ let tests = "tests" >::: [
       def f()
         self.a
       end
-    end" (Failure "A does not fully implement T: missing g");
+    end" (Failure "<type A> does not fully implement <trait T>: missing g");
+  "operator overloading" >:: make_test "struct A a b end impl for A def +(other) A(self.a + other.a, self.b + other.b) end end (A(2, 3) + A(7, 4)).a" (Number 9.0);
 ]
-let _ =
-  run_test_tt_main tests
+let _ = run_test_tt_main tests
