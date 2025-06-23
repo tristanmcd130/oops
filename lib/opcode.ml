@@ -24,11 +24,15 @@ type t =
 | SetLocal of int
 | Call of int
 | MakeCell of int
-| MakeClosure of int
+| Enclose of int
 | GetUpvalue of int
 | DerefUpvalue of int
 | Jump of int
 | JumpIfFalse of int
+| Dot of int
+| AddMethod of int
+| Impl
+| Pop
 
 let to_string = function
 | GetConstant i -> "get_constant " ^ string_of_int i
@@ -56,8 +60,12 @@ let to_string = function
 | SetLocal i -> "set_local " ^ string_of_int i
 | Call i -> "call " ^ string_of_int i
 | MakeCell i -> "make_cell " ^ string_of_int i
-| MakeClosure i -> "make_closure " ^ string_of_int i
+| Enclose i -> "enclose " ^ string_of_int i
 | GetUpvalue i -> "get_upvalue " ^ string_of_int i
 | DerefUpvalue i -> "deref_upvalue " ^ string_of_int i
 | Jump i -> "jump " ^ string_of_int i
 | JumpIfFalse i -> "jump_if_false " ^ string_of_int i
+| Dot i -> "dot " ^ string_of_int i
+| AddMethod i -> "add_method " ^ string_of_int i
+| Impl -> "impl"
+| Pop -> "pop"

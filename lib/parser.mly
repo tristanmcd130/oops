@@ -35,6 +35,11 @@
 %token ELSE
 %token LET
 %token IN
+%token STRUCT
+%token IMPL
+%token FOR
+%token DOT
+%token TRAIT
 %token <string> ID
 %token EOF
 %right CONS
@@ -55,14 +60,19 @@ block:
 	| s = stmt; ss = stmt+	{Block (s :: ss)}
 
 stmt:
-	| a = assign																	{match a with (n, v) -> Assign (n, v)}
-	| DEF; n = ID; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{Ast.Assign (n, Fun (ps, b))}
-	| e = exp																		{e}
+	| a = assign									{match a with (n, v) -> Assign (n, v)}
+	| d = def										{match d with (n, ps, b) -> Assign (n, Fun (n, ps, b))}
+	| STRUCT; n = ID; fs = ID*; END					{Assign (n, Struct (n, fs))}
+	| IMPL; t = exp?; FOR; ty = exp; ms = def*;	END	{Impl (t, ty, ms)}
+	| TRAIT; n = ID; rs = ID*; ps = def*; END		{Ast.Assign (n, Trait (n, rs, ps))}
+	| e = exp										{e}
 
 assign: n = ID; EQUAL; v = exp	{(n, v)}
 
+def: DEF; n = ID; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{(n, ps, b)}
+
 exp:
-	| NULL																	{Null}
+	| NULL																	{Ast.Null}
 	| b = BOOL																{Bool b}
 	| n = NUMBER															{Number n}
 	| s = STRING															{String s}
@@ -71,10 +81,11 @@ exp:
 	| n = ID																{Var n}
 	| o = unary_op; e = exp													{Unary (o, e)}
 	| e1 = exp; o = binary_op; e2 = exp										{Binary (e1, o, e2)}
-	| FUN; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{Fun (ps, b)}
+	| FUN; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{Fun ("", ps, b)}
 	| f = exp; LPAREN; a = separated_list(COMMA, exp); RPAREN				{Call (f, a)}
-	| IF; c = exp; THEN; t = block; es = elseif*; e = else_; END			{Ast.If ((c, t) :: es @ [e])}
-	| LET; a = separated_list(COMMA, assign); IN; b = block; END			{Call (Fun (List.map fst a, b), List.map snd a)}
+	| IF; c = exp; THEN; t = block; es = elseif*; e = else_; END			{If ((c, t) :: es @ [e])}
+	| LET; a = separated_list(COMMA, assign); IN; b = block; END			{Call (Fun ("", List.map fst a, b), List.map snd a)}
+	| e = exp; DOT; f = ID													{Dot (e, f)}
 	| LPAREN; e = exp; RPAREN												{e}
 
 map_entry: k = exp; COLON; v = exp	{(k, v)}

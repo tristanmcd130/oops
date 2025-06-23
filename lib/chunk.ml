@@ -82,7 +82,7 @@ let rec compile chunk scope = function
   | And -> And
   | Or -> Or
   | Cons -> Cons) |> ignore
-| Fun (ps, b) ->
+| Fun (n, ps, b) ->
   let c = empty () in
   let s = Scope.make (Some scope) ps in
   Scope.resolve_locals s b;
@@ -92,8 +92,9 @@ let rec compile chunk scope = function
     | Scope.Upvalue -> add_opcode chunk (GetUpvalue i) |> ignore
     | Local -> add_opcode chunk (MakeCell i) |> ignore
     | _ -> ());
-  add_opcode chunk (GetConstant (Function {chunk = c; num_args = List.length ps; num_locals = Hashtbl.length (Scope.locals s) - List.length ps} |> add_constant chunk)) |> ignore;
-  add_opcode chunk (MakeClosure (Scope.upvalues s |> Hashtbl.length)) |> ignore
+  add_opcode chunk (GetConstant (Closure {name = n; chunk = c; num_args = List.length ps; num_locals = Hashtbl.length (Scope.locals s) - List.length ps; upvalues = [||]} |> add_constant chunk)) |> ignore;
+  if Scope.upvalues s |> Hashtbl.length > 0 then
+    add_opcode chunk (Enclose (Scope.upvalues s |> Hashtbl.length)) |> ignore
 | Call (f, a) ->
   List.iter (compile chunk scope) a;
   compile chunk scope f;
@@ -113,8 +114,23 @@ let rec compile chunk scope = function
       chunk.code.(j2) <- Jump e);
     length chunk in
   compile_if bs |> ignore
-let to_closure chunk: t Value.closure = {func = {chunk; num_args = 0; num_locals = 0}; upvalues = [||]}
+| Struct (n, fs) -> add_opcode chunk (GetConstant (add_constant chunk (Type {name = n; fields = fs; methods = Hashtbl.create 16; traits = []}))) |> ignore
+| Dot (e, f) ->
+  compile chunk scope e;
+  add_opcode chunk (Dot (add_name chunk f)) |> ignore
+| Impl (t, ty, ms) ->
+  compile chunk scope ty;
+  List.iter (fun (n, ps, b) -> compile chunk scope (Fun (n, "self" :: ps, b)); add_opcode chunk (AddMethod (add_name chunk n)) |> ignore) ms;
+  (match t with
+  | None -> add_opcode chunk Pop
+  | Some t' ->
+    compile chunk scope t';
+    add_opcode chunk Impl) |> ignore
+| Trait (n, rs, ps) ->
+  add_opcode chunk (GetConstant (add_constant chunk (Trait {name = n; requires = rs; provides = Hashtbl.create 16}))) |> ignore;
+  List.iter (fun (n', ps, b) -> compile chunk scope (Fun (n', "self" :: ps, b)); add_opcode chunk (AddMethod (add_name chunk n')) |> ignore) ps
+let to_closure chunk: t Value.closure = {name = ""; chunk; num_args = 0; num_locals = 0; upvalues = [||]}
 let rec to_string chunk =
   "Code:\n" ^ (Array.mapi (fun i x -> string_of_int i ^ ": " ^ Opcode.to_string x) chunk.code |> Array.to_list |> String.concat "\n")
-  ^ "\n\nConstants:\n" ^ (Array.mapi (fun i x -> string_of_int i ^ ": " ^ Value.to_string x ^ (match x with Function f -> " (" ^ to_string f.chunk ^ ")" | _ -> "")) chunk.constants |> Array.to_list |> String.concat "\n")
+  ^ "\n\nConstants:\n" ^ (Array.mapi (fun i x -> string_of_int i ^ ": " ^ Value.to_string x) chunk.constants |> Array.to_list |> String.concat "\n")
   ^ "\n\nNames:\n" ^ (Array.mapi (fun i x -> string_of_int i ^ ": " ^ x) chunk.names |> Array.to_list |> String.concat "\n")

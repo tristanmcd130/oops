@@ -51,8 +51,13 @@ rule read = parse
 | "else"	{ELSE}
 | "let"		{LET}
 | "in"		{IN}
+| "struct"	{STRUCT}
+| '.'		{DOT}
+| "impl"	{IMPL}
+| "for"		{FOR}
+| "trait"	{TRAIT}
 | id		{ID (lexbuf |> lexeme)}
-| _			{failwith ("Unexpected character: " ^ lexeme lexbuf)}
+| _			{failwith ("Unexpected character " ^ lexeme lexbuf)}
 | eof		{EOF}
 and read_string buf = parse
 | '"'			{STRING (Buffer.contents buf)}
@@ -61,5 +66,5 @@ and read_string buf = parse
 | "\\n"			{Buffer.add_char buf '\n'; read_string buf lexbuf}
 | "\\t"			{Buffer.add_char buf '\t'; read_string buf lexbuf}
 | [^ '"' '\\']+	{lexeme lexbuf |> Buffer.add_string buf; read_string buf lexbuf}
-| _				{failwith ("Illegal string character: " ^ lexeme lexbuf)}
+| _				{failwith ("Illegal string character " ^ lexeme lexbuf)}
 | eof			{failwith "Unterminated string"}

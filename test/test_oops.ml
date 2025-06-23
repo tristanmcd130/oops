@@ -103,9 +103,9 @@ let tests = "tests" >::: [
   "unterminated string" >:: make_error_test "\"aaaaaaa" (Failure "Unterminated string");
   "list" >:: make_test "[1, null, \"b\"]" (List [Number 1.0; Null; String "b"]);
   "map" >:: make_test "{1: false, null: [], [4]: \"b\"}" (Map ([(Value.Number 1.0, Value.Bool false); (Null, List []); (List [Number 4.0], String "b")] |> List.to_seq |> Hashtbl.of_seq)); (* change 4 to 3 and this test fails for some reason *)
-  "unexpected char" >:: make_error_test "@" (Failure "Unexpected character: @");
+  "unexpected char" >:: make_error_test "@" (Failure "Unexpected character @");
   "global" >:: make_test ~globals: [("t", Number 5.0)] "t" (Number 5.0);
-  "undefined global" >:: make_error_test "t" (Failure "Undefined global variable: t");
+  "undefined global" >:: make_error_test "t" (Failure "Undefined global variable t");
   "negate" >:: make_test "--9" (Number 9.0);
   "add" >:: make_test "4 + 5" (Number 9.0);
   "add strings" >:: make_test "\"aa\" + \"ba\"" (String "aaba");
@@ -127,10 +127,10 @@ let tests = "tests" >::: [
   "logical precedence" >:: make_test "not true and false" (Bool false);
   "cons" >:: make_test "1 :: 2 :: 3 + 4 :: []" (List [Number 1.0; Number 2.0; Number 7.0]);
   "call" >:: make_test "(fun(x) x + 4 end)(4)" (Number 8.0);
-  "call with bad args" >:: make_error_test "(fun(x) x + 4 end)(4, 7)" (Failure "Function expected 1 arguments, but received 2");
+  "call with bad args" >:: make_error_test "(fun(x) x + 4 end)(4, 7)" (Failure "Function  expected 1 arguments, but received 2");
   "call with bad func" >:: make_error_test "6(4, 7)" (Failure "Cannot call 6");
   "upvalue" >:: make_test "(fun(x) y = 5 fun() x + y end end)(1)()" (Number 6.0);
-  "primitive" >:: make_test ~globals: [("add_one", Primitive (fun [Number x] -> Number (x +. 1.0)))] "add_one(44)" (Number 45.0);
+  "primitive" >:: make_test ~globals: [("add_one", Primitive ("add_one", fun [Number x] -> Number (x +. 1.0)))] "add_one(44)" (Number 45.0);
   "if" >:: make_test "if true then 1 else 2 end" (Number 1.0);
   "elseif" >:: make_test "if false then 1 elseif true then 2 else 3 end" (Number 2.0);
   "convoluted elseif" >:: make_test
@@ -169,7 +169,54 @@ let tests = "tests" >::: [
     end
     f()(6)" (Bool true);
   "let" >:: make_test "let x = 3, y = 0 in x + y end" (Number 3.0);
-  "let out of scope" >:: make_error_test "let x = 3 in x end x" (Failure "Undefined global variable: x");
+  "let out of scope" >:: make_error_test "let x = 3 in x end x" (Failure "Undefined global variable x");
+  "struct" >:: make_test "struct A a b end A(5, 6)" (Struct ({name = "A"; fields = ["a"; "b"]; methods = Hashtbl.create 16; traits = []}, [("a", Value.Number 5.0); ("b", Number 6.0)] |> List.to_seq |> Hashtbl.of_seq));
+  "struct with bad args" >:: make_error_test "struct A a b end A(56)" (Failure "A's constructor expected 2 arguments, but received 1");
+  "dot" >:: make_test "struct A a b end A(5, 6).b" (Number 6.0);
+  "dot nonexistent field" >:: make_error_test "struct A a b end A(5, 6).c" (Failure "A has no field/method c");
+  "impl for" >:: make_test "struct A a b end impl for A def f() self.a + self.b end end A(5, 6).f()" (Number 11.0);
+  "bound primitive" >:: make_test ~globals: [("A", Type {name = "A"; fields = ["a"; "b"]; methods = [("f", Value.Primitive ("f", fun [Struct (_, fs); Number x] ->
+    let Number a = Hashtbl.find fs "a" in
+    let Number b = Hashtbl.find fs "b" in
+    Number (a +. b +. x)))] |> List.to_seq |> Hashtbl.of_seq; traits = []})] "f = A(2, 4).f f(7)" (Number 13.0);
+  "impl" >:: make_test
+    "trait T
+      f
+      g
+      def h()
+        self.f() + self.g()
+      end
+    end
+    struct A
+      a
+      b
+    end
+    impl T for A
+      def f()
+        self.a
+      end
+      def g()
+        self.b
+      end
+    end
+    A(4, 6).h()" (Number 10.0);
+  "partial impl" >:: make_error_test
+    "trait T
+      f
+      g
+      def h()
+        self.f() + self.g()
+      end
+    end
+    struct A
+      a
+      b
+    end
+    impl T for A
+      def f()
+        self.a
+      end
+    end" (Failure "A does not fully implement T: missing g");
 ]
 let _ =
   run_test_tt_main tests

@@ -10,9 +10,13 @@ type t =
 | Assign of string * t
 | Unary of unary_op * t
 | Binary of t * binary_op * t
-| Fun of string list * t
+| Fun of string * string list * t
 | Call of t * t list
 | If of (t * t) list
+| Struct of string * string list
+| Dot of t * string
+| Impl of t option * t * (string * string list * t) list
+| Trait of string * string list * (string * string list * t) list
 and unary_op =
 | Negate
 | Not
@@ -32,4 +36,4 @@ and binary_op =
 | Or
 | Cons
 
-val to_string: t -> string
+(* val to_string: t -> string *)

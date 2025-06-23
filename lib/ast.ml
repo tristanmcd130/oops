@@ -10,9 +10,13 @@ type t =
 | Assign of string * t
 | Unary of unary_op * t
 | Binary of t * binary_op * t
-| Fun of string list * t
+| Fun of string * string list * t
 | Call of t * t list
 | If of (t * t) list
+| Struct of string * string list
+| Dot of t * string
+| Impl of t option * t * (string * string list * t) list
+| Trait of string * string list * (string * string list * t) list
 and unary_op =
 | Negate
 | Not
@@ -32,7 +36,7 @@ and binary_op =
 | Or
 | Cons
 
-let rec to_string = function
+(* let rec to_string = function
 | Block b -> "Block([" ^ (b |> List.map to_string |> String.concat ", ") ^ "])"
 | Bool b -> "Bool(" ^ string_of_bool b ^ ")"
 | Null -> "Null"
@@ -60,6 +64,10 @@ let rec to_string = function
   | And -> "and"
   | Or -> "or"
   | Cons -> "::") ^ ", " ^ to_string e2 ^ ")"
-| Fun (ps, b) -> "Fun([" ^ (ps |> String.concat ", ") ^ "], " ^ to_string b ^ ")"
+| Fun (n, ps, b) -> "Fun(" ^ n ^ ", [" ^ (ps |> String.concat ", ") ^ "], " ^ to_string b ^ ")"
 | Call (f, a) -> "Call(" ^ to_string f ^ ", [" ^ (a |> List.map to_string |> String.concat ", ") ^ "])"
 | If bs -> "If([" ^ (List.map (fun (c, t) -> "(" ^ to_string c ^ ", " ^ to_string t ^ ")") bs |> String.concat ", ") ^ "])"
+| Struct (n, fs) -> "Struct(" ^ n ^ ", [" ^ String.concat "," fs ^ "])"
+| Dot (e, f) -> "Dot(" ^ to_string e ^ ", " ^ f ^ ")"
+| Impl (t, ty, ms) -> "Impl(" ^ (match t with None -> "" | Some t' -> to_string t' ^ ", ") ^ to_string ty ^ ", [" ^ (ms |> List.map (fun (n, ps, b) -> "(" ^ n ^ ", " ^ to_string (Fun (ps, b)) ^ ")") |> String.concat ", ") ^ "])"
+| Trait (n, rs, ps) -> "Trait(" ^ n ^ ", [" ^ (rs |> String.concat ", ") ^ "], [" ^ (ps |> List.map (fun (n, ps, b) -> "(" ^ n ^ ", " ^ to_string (Fun (ps, b)) ^ ")") |> String.concat ", ") ^ "])" *)

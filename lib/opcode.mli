@@ -24,10 +24,14 @@ type t =
 | SetLocal of int
 | Call of int
 | MakeCell of int
-| MakeClosure of int
+| Enclose of int
 | GetUpvalue of int
 | DerefUpvalue of int
 | Jump of int
 | JumpIfFalse of int
+| Dot of int
+| AddMethod of int
+| Impl
+| Pop
 
 val to_string: t -> string
