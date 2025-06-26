@@ -1,3 +1,4 @@
 (test
  (name test_oops)
- (libraries ounit2 oops))
+ (libraries ounit2 oops)
+ (deps import_test.oops))

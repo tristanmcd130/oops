@@ -17,6 +17,9 @@ type t =
 | AddMethod of int
 | Impl
 | BaseTrait
+| Import of int
+| DupDot of int
+| TailCall of int
 
 let to_string = function
 | GetConstant i -> "get_constant " ^ string_of_int i
@@ -37,3 +40,6 @@ let to_string = function
 | AddMethod i -> "add_method " ^ string_of_int i
 | Impl -> "impl"
 | BaseTrait -> "base_trait"
+| Import i -> "import " ^ string_of_int i
+| DupDot i -> "dup_dot " ^ string_of_int i
+| TailCall i -> "tall_call " ^ string_of_int i

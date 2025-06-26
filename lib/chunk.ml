@@ -74,8 +74,7 @@ let dot obj name =
     | Some i -> fs.(i))
   | _ -> get_method obj name
 
-let make code constants names = {code; constants; names}
-let empty () = make [||] [||] [||]
+let empty () = {code = [||]; constants = [||]; names = [||]}
 let rec find_first value = function
 | [||] -> None
 | a ->
@@ -106,7 +105,9 @@ let add_name chunk name =
 let length chunk = Array.length chunk.code
 let rec compile chunk scope = function
 | Ast.Block [] -> ()
-| Block (x :: xs) ->
+| Block [Export ns as e] -> compile chunk scope e
+| Block (Export ns :: xs) -> compile chunk scope (Block (xs @ [Export ns]))
+| Block (x :: xs) -> (* move all exports to the end *)
   compile chunk scope x;
   compile chunk scope (Block xs)
 | Null -> add_opcode chunk (GetConstant (add_constant chunk Null)) |> ignore
@@ -117,13 +118,13 @@ let rec compile chunk scope = function
   List.iter (compile chunk scope) l;
   add_opcode chunk (MakeList (List.length l)) |> ignore
 | Map m ->
-  List.iter (fun (k, v) -> compile chunk scope k ; compile chunk scope v) m;
+  List.iter (fun (k, v) -> compile chunk scope k; compile chunk scope v) m;
   add_opcode chunk (MakeMap (List.length m)) |> ignore
 | Var n ->
   (match Scope.get_level scope n with
   | Global -> add_opcode chunk (GetGlobal (add_name chunk n))
   | Upvalue -> add_opcode chunk (DerefUpvalue (Scope.add_upvalue scope n))
-  | Local -> add_opcode chunk (GetLocal (Scope.add_local scope n))) |> ignore
+  | Local -> add_opcode chunk (GetLocal (Scope.find_local scope n))) |> ignore
 | Assign (n, v) ->
   compile chunk scope v;
   (match Scope.parent scope with
@@ -131,9 +132,9 @@ let rec compile chunk scope = function
   | Some _ -> add_opcode chunk (SetLocal (Scope.add_local scope n))) |> ignore
 | Fun (n, ps, b) ->
   let c = empty () in
-  let s = Scope.make (Some scope) ps in
+  let s = Scope.make (Some scope) false ps in (* should it be false? *)
   Scope.resolve_locals s b;
-  compile c s b;
+  tail_compile c s b;
   Scope.upvalues s |> Hashtbl.iter (fun n (i, l) ->
     match l with
     | Scope.Upvalue -> add_opcode chunk (GetUpvalue i) |> ignore
@@ -175,6 +176,27 @@ let rec compile chunk scope = function
 | Trait (n, rs, ps) ->
   add_opcode chunk (GetConstant (add_constant chunk (Trait {name = n; requires = rs; provides = Hashtbl.create 16}))) |> ignore;
   List.iter (fun (n', ps, b) -> compile chunk scope (Fun (n', "self" :: ps, b)); add_opcode chunk (AddMethod (add_name chunk n')) |> ignore) ps
+| Import (f, ns) ->
+  let n = String.sub (String.split_on_char '/' f |> List.rev |> List.hd) 0 (String.length f - 5) in
+  add_opcode chunk (Import (add_name chunk f)) |> ignore;
+  (match (Scope.parent scope, ns) with
+  | (None, None) -> add_opcode chunk (SetGlobal (add_name chunk n)) |> ignore
+  | (None, Some ns') -> List.iter (fun (n1, n2) -> add_opcode chunk (DupDot (add_name chunk n1)) |> ignore; add_opcode chunk (SetGlobal (add_name chunk n2)) |> ignore) ns'
+  | (Some _, None) -> add_opcode chunk (SetLocal (Scope.add_local scope n)) |> ignore
+  | (Some _, Some ns') -> List.iter (fun (n1, n2) -> add_opcode chunk (DupDot (add_name chunk n1)) |> ignore; add_opcode chunk (SetLocal (Scope.add_local scope n2)) |> ignore) ns')
+| Export ns -> compile chunk scope (Call (Struct ("Exports", ns), List.map (fun x -> Ast.Var x) ns))
+and tail_compile chunk scope = function
+| Ast.Block [Call (f, a) as c] -> tail_compile chunk scope c
+| Block [Export ns as e] -> tail_compile chunk scope e
+| Block (Export ns :: xs) -> tail_compile chunk scope (Block (xs @ [Export ns]))
+| Block (x :: xs) -> (* move all exports to the end *)
+  compile chunk scope x;
+  tail_compile chunk scope (Block xs)
+| Call (f, a) ->
+  List.iter (compile chunk scope) a;
+  compile chunk scope f;
+  add_opcode chunk (TailCall (List.length a)) |> ignore
+| x -> compile chunk scope x
 let to_closure chunk: t Value.closure = {name = ""; chunk; num_args = 0; num_locals = 0; upvalues = [||]}
 let rec to_string chunk =
   "Code:\n" ^ (Array.mapi (fun i x -> string_of_int i ^ ": " ^ Opcode.to_string x) chunk.code |> Array.to_list |> String.concat "\n")

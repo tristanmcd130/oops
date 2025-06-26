@@ -24,6 +24,7 @@ rule read = parse
 | '{'		{LBRACE}
 | ':'		{COLON}
 | '}'		{RBRACE}
+| "u-"		{UMINUS}
 | '+'		{PLUS}
 | '-'		{MINUS}
 | '*'		{STAR}
@@ -56,6 +57,9 @@ rule read = parse
 | "impl"	{IMPL}
 | "for"		{FOR}
 | "trait"	{TRAIT}
+| "import"	{IMPORT}
+| "export"	{EXPORT}
+| "as"		{AS}
 | id		{ID (lexbuf |> lexeme)}
 | _			{failwith ("Unexpected character " ^ lexeme lexbuf)}
 | eof		{EOF}

@@ -17,5 +17,8 @@ type t =
 | AddMethod of int
 | Impl
 | BaseTrait
+| Import of int
+| DupDot of int
+| TailCall of int
 
 val to_string: t -> string

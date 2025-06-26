@@ -84,12 +84,12 @@ let vm_tests = "vm tests" >::: [
 
 let make_test ?(globals = []) string result _ =
   let chunk = Chunk.empty () in
-  string |> Lexing.from_string |> Parser.program Lexer.read |> Chunk.compile chunk (Scope.make None []);
+  string |> Lexing.from_string |> Parser.program Lexer.read |> Chunk.compile chunk (Scope.make None false []);
   assert_equal result (Vm.call (globals |> List.to_seq |> Hashtbl.of_seq |> Vm.make) (Chunk.to_closure chunk) []) ~printer: Value.to_string
 let make_error_test ?(globals = []) string error _ =
   assert_raises error (fun _ ->
     let chunk = Chunk.empty () in
-    string |> Lexing.from_string |> Parser.program Lexer.read |> Chunk.compile chunk (Scope.make None []);
+    string |> Lexing.from_string |> Parser.program Lexer.read |> Chunk.compile chunk (Scope.make None false []);
     Vm.call (globals |> List.to_seq |> Hashtbl.of_seq |> Vm.make) (Chunk.to_closure chunk) [])
 let tests = "tests" >::: [
   "empty" >:: make_test "" Null;
@@ -219,5 +219,12 @@ let tests = "tests" >::: [
       end
     end" (Failure "<type A> does not fully implement <trait T>: missing g");
   "operator overloading" >:: make_test "struct A a b end impl for A def +(other) A(self.a + other.a, self.b + other.b) end end (A(2, 3) + A(7, 4)).a" (Number 9.0);
+  "import" >:: make_test "import \"import_test.oops\" import_test.a" (Number 100.0);
+  "import private" >:: make_error_test "import \"import_test.oops\" import_test.b" (Failure "<type Exports> has no field/method b");
+  "import not global" >:: make_error_test "import \"import_test.oops\" a" (Failure "Undefined global variable a");
+  "import for" >:: make_test "import \"import_test.oops\" for a a" (Number 100.0);
+  "import for no module" >:: make_error_test "import \"import_test.oops\" for a import_test" (Failure "Undefined global variable import_test");
+  "import for as" >:: make_test "import \"import_test.oops\" for a as b b" (Number 100.0);
+  "tail call" >:: make_test "def f(x) if x <= 0 then true else f(x - 1) end end f(1e4)" (Bool true);
 ]
 let _ = run_test_tt_main tests

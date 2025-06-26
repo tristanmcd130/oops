@@ -8,6 +8,7 @@
 %token LBRACE
 %token COLON
 %token RBRACE
+%token UMINUS
 %token PLUS
 %token MINUS
 %token STAR
@@ -40,6 +41,9 @@
 %token FOR
 %token DOT
 %token TRAIT
+%token IMPORT
+%token EXPORT
+%token AS
 %token <string> ID
 %token EOF
 %right CONS
@@ -64,7 +68,9 @@ stmt:
 	| d = def										{match d with (n, ps, b) -> Assign (n, Fun (n, ps, b))}
 	| STRUCT; n = ID; fs = ID*; END					{Assign (n, Struct (n, fs))}
 	| IMPL; t = exp?; FOR; ty = exp; ms = def*;	END	{Impl (t, ty, ms)}
-	| TRAIT; n = ID; rs = ID*; ps = def*; END		{Ast.Assign (n, Trait (n, rs, ps))}
+	| TRAIT; n = ID; rs = ID*; ps = def*; END		{Assign (n, Trait (n, rs, ps))}
+	| IMPORT; s = STRING; f = for_?					{Import (s, f)}
+	| EXPORT; es = separated_list(COMMA, ID)		{Ast.Export es}
 	| e = exp										{e}
 
 assign: n = ID; EQUAL; v = exp	{(n, v)}
@@ -72,7 +78,7 @@ assign: n = ID; EQUAL; v = exp	{(n, v)}
 def: DEF; n = fun_id; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{(n, ps, b)}
 
 fun_id:
-	| MINUS		{"u-"}
+	| UMINUS	{"u-"}
 	| NOT		{"not"}
 	| PLUS		{"+"}
 	| MINUS		{"-"}
@@ -89,6 +95,12 @@ fun_id:
 	| OR		{"or"}
 	| CONS		{"::"}
 	| n = ID	{n}
+
+for_: FOR; ns = separated_list(COMMA, as_)	{ns}
+
+as_:
+	| n = ID				{(n, n)}
+	| n1 = ID; AS; n2 = ID	{(n1, n2)}
 
 exp:
 	| NULL																	{Ast.Null}
