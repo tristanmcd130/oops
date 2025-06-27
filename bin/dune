@@ -1,4 +1,5 @@
 (executable
  (public_name oops)
  (name main)
- (libraries oops))
+ (libraries oops)
+ (preprocess (pps landmarks-ppx --auto)))

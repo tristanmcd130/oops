@@ -6,4 +6,5 @@
 
 (library
  (name oops)
- (modules lexer parser ast value opcode scope chunk vm))
+ (modules lexer parser ast value opcode scope chunk vm)
+ (preprocess (pps landmarks-ppx --auto)))
