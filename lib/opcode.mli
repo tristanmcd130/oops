@@ -20,5 +20,6 @@ type t =
 | Import of int
 | DupDot of int
 | TailCall of int
+| Throw
 
 val to_string: t -> string

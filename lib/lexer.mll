@@ -60,6 +60,7 @@ rule read = parse
 | "import"	{IMPORT}
 | "export"	{EXPORT}
 | "as"		{AS}
+| "throw"	{THROW}
 | id		{ID (lexbuf |> lexeme)}
 | _			{failwith ("Unexpected character " ^ lexeme lexbuf)}
 | eof		{EOF}

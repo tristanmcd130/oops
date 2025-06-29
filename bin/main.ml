@@ -1,10 +1,15 @@
 open Oops
 
-let vm = Vm.make ([("print", Value.Primitive (fun [x] -> x |> Value.to_string |> print_endline; Null))] |> List.to_seq |> Hashtbl.of_seq)
+let vm = Vm.make ([("print", Types.Primitive (fun [x] -> x |> Value.to_string |> print_endline; Null))] |> List.to_seq |> Hashtbl.of_seq)
 let run_from_channel channel =
   let chunk = Chunk.empty () in
   channel |> Lexing.from_channel |> Parser.program Lexer.read |> Chunk.compile chunk (Scope.make None false []);
-  Vm.call vm (Chunk.to_closure chunk) []
+  try
+    Vm.call vm (Chunk.to_closure chunk) []
+  with
+  | e ->
+    prerr_endline ("Uncaught primitive exception: " ^ Printexc.to_string e);
+    Null
 let rec repl line_num =
   Printf.printf "%d> " line_num;
   flush stdout;

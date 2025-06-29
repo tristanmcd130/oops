@@ -17,6 +17,7 @@ type t =
 | Trait of string * string list * (string * string list * t) list
 | Import of string * (string * string) list option
 | Export of string list
+| Throw of t
 
 (* let rec to_string = function
 | Block b -> "Block([" ^ (b |> List.map to_string |> String.concat ", ") ^ "])"

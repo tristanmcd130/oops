@@ -44,6 +44,7 @@
 %token IMPORT
 %token EXPORT
 %token AS
+%token THROW
 %token <string> ID
 %token EOF
 %right CONS
@@ -70,7 +71,8 @@ stmt:
 	| IMPL; t = exp?; FOR; ty = exp; ms = def*;	END	{Impl (t, ty, ms)}
 	| TRAIT; n = ID; rs = ID*; ps = def*; END		{Assign (n, Trait (n, rs, ps))}
 	| IMPORT; s = STRING; f = for_?					{Import (s, f)}
-	| EXPORT; es = separated_list(COMMA, ID)		{Ast.Export es}
+	| EXPORT; es = separated_list(COMMA, ID)		{Export es}
+	| THROW; e = exp								{Ast.Throw e}
 	| e = exp										{e}
 
 assign: n = ID; EQUAL; v = exp	{(n, v)}

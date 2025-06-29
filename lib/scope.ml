@@ -10,10 +10,6 @@ and level =
 | Local
 
 let make parent in_module locals = {parent; in_module; locals = List.mapi (fun i n -> (n, i)) locals |> List.to_seq |> Hashtbl.of_seq; upvalues = Hashtbl.create 16}
-let parent scope = scope.parent
-let in_module scope = scope.in_module
-let locals scope = scope.locals
-let upvalues scope = scope.upvalues
 let rec get_upvalue_level scope name =
   match Hashtbl.find_opt scope.locals name with
   | None ->

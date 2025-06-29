@@ -17,5 +17,6 @@ type t =
 | Trait of string * string list * (string * string list * t) list
 | Import of string * (string * string) list option
 | Export of string list
+| Throw of t
 
 (* val to_string: t -> string *)

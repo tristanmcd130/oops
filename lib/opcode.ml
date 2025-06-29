@@ -20,6 +20,7 @@ type t =
 | Import of int
 | DupDot of int
 | TailCall of int
+| Throw
 
 let to_string = function
 | GetConstant i -> "get_constant " ^ string_of_int i
@@ -43,3 +44,4 @@ let to_string = function
 | Import i -> "import " ^ string_of_int i
 | DupDot i -> "dup_dot " ^ string_of_int i
 | TailCall i -> "tall_call " ^ string_of_int i
+| Throw -> "throw"

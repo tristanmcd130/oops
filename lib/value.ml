@@ -1,35 +1,8 @@
-type 'a t =
-| Null
-| Bool of bool
-| Number of float
-| String of string
-| List of 'a t list
-| Map of ('a t, 'a t) Hashtbl.t
-| Closure of 'a closure
-| Cell of 'a t ref
-| Primitive of ('a t list -> 'a t)
-| Struct of 'a typ * 'a t array
-| Type of 'a typ
-| Trait of 'a trait
-| Method of 'a t * 'a closure
-and 'a closure = {
-  name: string;
-  chunk: 'a;
-  num_args: int;
-  num_locals: int;
-  upvalues: 'a t ref array;
-}
-and 'a typ = {
-  name: string;
-  fields: (string, int) Hashtbl.t;
-  methods: (string, 'a t) Hashtbl.t;
-  mutable traits: 'a trait list;
-}
-and 'a trait = {
-  name: string;
-  requires: string list;
-  provides: (string, 'a t) Hashtbl.t;
-}
+include Types
+
+type t = Types.value
+
+exception Runtime_error of t
 
 let rec to_string = function
 | Null -> "null"
@@ -46,3 +19,72 @@ let rec to_string = function
 | Type t -> "<type " ^ t.name ^ ">"
 | Trait t -> "<trait " ^ t.name ^ ">"
 | Method (_, c) -> to_string (Closure c)
+let base_trait = {name = "Base"; requires = []; provides = [
+  ("==", Primitive (fun [self; other] -> Bool (self = other)));
+  ("!=", Primitive (fun [self; other] -> Bool (self <> other)));
+  ("to_string", Primitive (fun [self] -> String (to_string self)));
+] |> List.to_seq |> Hashtbl.of_seq}
+let null_type = {name = "Null"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let bool_type = {name = "Bool"; fields = Hashtbl.create 0; methods = [
+  ("not", Primitive (fun [Bool self] -> Bool (not self)));
+  ("and", Primitive (fun [Bool self; Bool other] -> Bool (self && other)));
+  ("or", Primitive (fun [Bool self; Bool other] -> Bool (self || other)));
+] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let number_type = {name = "Number"; fields = Hashtbl.create 0; methods = [
+  ("u-", Primitive (fun [Number self] -> Number (-.self)));
+  ("+", Primitive (fun [Number self; Number other] -> Number (self +. other)));
+  ("-", Primitive (fun [Number self; Number other] -> Number (self -. other)));
+  ("*", Primitive (fun [Number self; Number other] -> Number (self *. other)));
+  ("/", Primitive (fun [Number self; Number other] -> Number (self /. other)));
+  ("%", Primitive (fun [Number self; Number other] -> Number (mod_float self other)));
+  ("<", Primitive (fun [Number self; Number other] -> Bool (self < other)));
+  ("<=", Primitive (fun [Number self; Number other] -> Bool (self <= other)));
+  (">", Primitive (fun [Number self; Number other] -> Bool (self > other)));
+  (">=", Primitive (fun [Number self; Number other] -> Bool (self >= other)));
+] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let string_type = {name = "String"; fields = Hashtbl.create 0; methods = [
+  ("+", Primitive (fun [String self; String other] -> String (self ^ other)));
+] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let list_type = {name = "List"; fields = Hashtbl.create 0; methods = [
+  ("::", Primitive (fun [List self; other] -> List (other :: self)));
+] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let map_type = {name = "Map"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let function_type = {name = "Function"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let type_type = {name = "Type"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let trait_type = {name = "Trait"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let rec type_of = function
+| Null -> null_type
+| Bool _ -> bool_type
+| Number _ -> number_type
+| String _ -> string_type
+| List _ -> list_type
+| Map _ -> map_type
+| Closure _ | Primitive _ | Method _ -> function_type
+| Cell c -> type_of !c
+| Struct (t, _) -> t
+| Type _ -> type_type
+| Trait _ -> trait_type
+let bind_self self = function
+| Closure c -> Method (self, c)
+| Primitive p -> Primitive (fun args -> p (self :: args))
+| x -> failwith ("Cannot bind self in " ^ to_string x)
+let rec get_method_from_traits obj name = function
+| [] -> None
+| t :: ts ->
+  match Hashtbl.find_opt t.provides name with
+  | None -> get_method_from_traits obj name ts
+  | Some m -> Some m
+let get_method obj name =
+  (match Hashtbl.find_opt (type_of obj).methods name with
+  | None ->
+    (match get_method_from_traits obj name (type_of obj).traits with
+    | None -> failwith ( to_string (Type (type_of obj)) ^ " has no field/method " ^ name)
+    | Some m -> m)
+  | Some m -> m) |> bind_self obj
+let dot obj name =
+  match obj with
+  | Struct (t, fs) ->
+    (match Hashtbl.find_opt t.fields name with
+    | None -> get_method obj name
+    | Some i -> fs.(i))
+  | _ -> get_method obj name
