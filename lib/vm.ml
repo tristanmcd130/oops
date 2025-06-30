@@ -22,6 +22,27 @@ let pop_frame vm =
   vm.frames <- List.tl vm.frames;
   frame
 let subset a b = List.for_all (fun x -> List.mem x b) a
+let throw vm error =
+  let rec find_handler ip = function
+  | [] -> None
+  | (s, e) :: hs ->
+    if s <= ip && ip <= e then
+      Some (e + 1)
+    else
+      find_handler ip hs in
+  let found = ref false in
+  while List.length vm.frames > 0 && not !found do
+    let f = List.hd vm.frames in
+    match find_handler f.ip f.closure.chunk.handlers with
+    | None -> pop_frame vm |> ignore
+    | Some ip ->
+      found := true;
+      f.ip <- ip;
+      push vm error
+  done;
+  (if not !found then
+    prerr_endline ("Uncaught exception: " ^ Value.to_string error));
+  !found
 let step vm =
   let top_frame = List.hd vm.frames in
   if top_frame.ip < Chunk.length top_frame.closure.chunk then
@@ -67,7 +88,11 @@ let step vm =
             push_frame vm c args
           else
             failwith (Value.to_string (Closure c) ^ " expected " ^ string_of_int c.num_args ^ " arguments, but received " ^ string_of_int i)
-        | Primitive p -> p args |> push vm
+        | Primitive p -> 
+          (try
+            p args |> push vm
+          with
+          | e -> failwith "Invalid arguments to primitive function")
         | Type t ->
           if List.length args = Hashtbl.length t.fields then
             Struct (t, args |> Array.of_list) |> push vm
@@ -119,12 +144,12 @@ let step vm =
     | Import i ->
       let c = Chunk.empty () in
       let s = Scope.make None [] in
-      let m = Module.make top_frame.closure.chunk.names.(i) None in
-      let b = top_frame.closure.chunk.names.(i) ^ ".oops" |> open_in |> Lexing.from_channel |> Parser.program Lexer.read in
+      let m = Module.make top_frame.closure.chunk.names.(i) [] in
+      let b = top_frame.closure.chunk.names.(i) |> open_in |> Lexing.from_channel |> Parser.program Lexer.read in
       Chunk.compile c s m b;
-      Chunk.add_opcode c PushExports |> ignore;
-      push_frame vm {name = ""; module' = m; chunk = c; num_args = 0; num_locals = 0; upvalues = [||]} []
-    | PushExports -> Module top_frame.closure.module' |> push vm
+      Chunk.add_opcode c PushModule |> ignore;
+      push_frame vm (Chunk.to_closure c m) []
+    | PushModule -> Module top_frame.closure.module' |> push vm
     | DupDot i -> top_frame.closure.chunk.names.(i) |> Value.dot (List.hd top_frame.stack) |> push vm
     | TailCall i ->
       let f = pop vm in
@@ -149,28 +174,7 @@ let step vm =
         | Method (s, c) -> tail_call_helper (Closure c) (s :: args)
         | x -> failwith ("Cannot tail call " ^ Value.to_string x) in
       tail_call_helper f !a
-    | Throw ->
-      let rec find_handler ip = function
-      | [] -> None
-      | (s, e) :: hs ->
-        if s <= ip && ip <= e then
-          Some (e + 1)
-        else
-          find_handler ip hs in
-      let e = pop vm in
-      let found = ref false in
-      while List.length vm.frames > 0 && not !found do
-        let f = List.hd vm.frames in
-        match find_handler f.ip f.closure.chunk.handlers with
-        | None -> pop_frame vm |> ignore
-        | Some ip ->
-          found := true;
-          f.ip <- ip;
-          push vm e
-      done;
-      if not !found then
-        (continue := false;
-        prerr_endline ("Uncaught exception: " ^ Value.to_string e)));
+    | Throw -> continue := throw vm (pop vm));
     !continue
   else if List.length vm.frames = 1 then
     false
@@ -182,6 +186,11 @@ let step vm =
 let call vm closure args =
   push_frame vm closure args;
   while step vm do () done;
-  match (pop_frame vm).stack with
+  match vm.frames with
   | [] -> Types.Null
-  | x :: _ -> x
+  | {stack = []} :: _ ->
+    pop_frame vm |> ignore;
+    Null
+  | {stack = x :: _} :: _ ->
+    pop_frame vm |> ignore;
+    x

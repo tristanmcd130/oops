@@ -3,13 +3,13 @@ open Oops
 
 let make_test ?(module_vars = []) string result _ =
   let chunk = Chunk.empty () in
-  let module': Module.t = {name = ""; parent = None; vars = module_vars |> List.to_seq |> Hashtbl.of_seq; exports = []} in
+  let module' = Module.make "" module_vars in
   string |> Lexing.from_string |> Parser.program Lexer.read |> Chunk.compile chunk (Scope.make None []) module';
   assert_equal result (Vm.call (Vm.make ()) (Chunk.to_closure chunk module') []) ~printer: Value.to_string
 let make_error_test ?(module_vars = []) string error _ =
   assert_raises error (fun _ ->
     let chunk = Chunk.empty () in
-    let module': Module.t = {name = ""; parent = None; vars = module_vars |> List.to_seq |> Hashtbl.of_seq; exports = []} in
+    let module' = Module.make "" module_vars in
     string |> Lexing.from_string |> Parser.program Lexer.read |> Chunk.compile chunk (Scope.make None []) module';
     Vm.call (Vm.make ()) (Chunk.to_closure chunk module') [])
 let tests = "tests" >::: [
@@ -30,7 +30,7 @@ let tests = "tests" >::: [
   "negate" >:: make_test "--9" (Number 9.0);
   "add" >:: make_test "4 + 5" (Number 9.0);
   "add strings" >:: make_test "\"aa\" + \"ba\"" (String "aaba");
-  "add string and number" >:: make_error_test "\"aa\" + 5" (Failure "Invalid arguments to +");
+  "add string and number" >:: make_error_test "\"aa\" + 5" (Failure "Invalid arguments to primitive function");
   "subtract" >:: make_test "4 - 5" (Number (-1.0));
   "multiply" >:: make_test "4 * 5" (Number 20.0);
   "divide" >:: make_test "4 / 5" (Number (0.8));
@@ -140,18 +140,26 @@ let tests = "tests" >::: [
       end
     end" (Failure "<type A> does not fully implement <trait T>: missing g");
   "operator overloading" >:: make_test "struct A a b end impl for A def +(other) A(self.a + other.a, self.b + other.b) end end (A(2, 3) + A(7, 4)).a" (Number 9.0);
-  "import" >:: make_test "import import_test import_test.a" (Number 100.0);
-  "import private" >:: make_error_test "import import_test import_test.b" (Failure "<module import_test> does not export b");
-  "import not global" >:: make_error_test "import import_test a" (Failure "Undefined global variable a");
-  "import for" >:: make_test "import import_test for a a" (Number 100.0);
-  "import for no module" >:: make_error_test "import import_test for a import_test" (Failure "Undefined global variable import_test");
-  "import for as" >:: make_test "import import_test for a as b b" (Number 100.0);
+  "import" >:: make_test "import \"import_test.oops\" import_test.a" (Number 100.0);
+  "import private" >:: make_error_test "import \"import_test.oops\" import_test.b" (Failure "<module from import_test.oops> does not export b");
+  "import not global" >:: make_error_test "import \"import_test.oops\" a" (Failure "Undefined global variable a");
+  "import for" >:: make_test "import \"import_test.oops\" for a a" (Number 100.0);
+  "import for no module" >:: make_error_test "import \"import_test.oops\" for a import_test" (Failure "Undefined global variable import_test");
+  "import for as" >:: make_test "import \"import_test.oops\" for a as b b" (Number 100.0);
   "tail call" >:: make_test "def f(x) if x <= 0 then true else f(x - 1) end end f(1e4)" (Bool true);
-  "throw" >:: make_error_test "throw 6" (Value.Runtime_error (Number 6.0));
-  "try" >:: make_test "try throw 8 catch Number as n n end" (Number 8.0);
-  "empty try" >:: make_test "try catch Number as n n end" Null;
-  "nested try" >:: make_test "try try try throw true catch Number as n n end catch Bool as b b end catch String as s s end" (Bool true);
-  "try no error" >:: make_test "try 4 catch Number as n n end" (Number 4.0);
-  "catch wrong type" >:: make_error_test "try throw 8 catch String as s s end" (Value.Runtime_error (Number 8.0));
+  "throw" >:: make_test "throw 6" Null;
+  "try" >:: make_test "try throw 8 catch n n end" (Number 8.0);
+  "empty try" >:: make_test "fun(x, y) x == null end(try catch n n end, 5)" (Bool true);
+  "try in catch" >:: make_test
+  "try
+    throw 5
+  catch n
+    try
+      throw n + 1
+    catch m
+      m + 1
+    end
+  end" (Number 7.0);
+  "try no error" >:: make_test "try 4 catch n n + 2 end" (Number 4.0);
 ]
 let _ = run_test_tt_main tests

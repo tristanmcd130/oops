@@ -1,71 +1,53 @@
-trait Iterator
-	get
-	next
-	done
+trait Stream
+	head
+	tail
+	is_empty
 	def for_each(f)
-		if self.done() then
+		if self.is_empty() then
 			null
 		else
-			f(self.get())
-			self.next().for_each(f)
+			f(self.head())
+			self.tail().for_each(f)
 		end
 	end
 	def map(f)
-		if self.done() then
+		if self.is_empty() then
 			[]
 		else
-			f(self.get()) :: self.next().map(f)
+			f(self.head()) :: self.tail().map(f)
 		end
 	end
 	def filter(f)
-		if self.done() then
+		if self.is_empty() then
 			[]
 		else
-			let x = self.get() in
+			let x = self.head() in
 				if f(x) then
-					x :: self.next().filter(f)
+					x :: self.tail().filter(f)
 				else
-					self.next().filter(f)
+					self.tail().filter(f)
 				end
 			end
 		end
 	end
 	def fold(f, i)
-		if self.done() then
+		if self.is_empty() then
 			i
 		else
-			self.next().fold(f, f(i, self.get()))
+			self.tail().fold(f, f(i, self.head()))
 		end
 	end
 	def collect()
-		if self.done() then
+		if self.is_empty() then
 			[]
 		else
-			self.get() :: self.next().collect()
+			self.head() :: self.tail().collect()
 		end
 	end
 end
 
-impl Iterator for List
-	def get()
-		self.head()
-	end
-	def next()
-		self.tail()
-	end
-	def done()
-		self.length() == 0
-	end
-end
-
-impl Iterator for String
-	def get()
-		self.head()
-	end
-	def next()
-		self.tail()
-	end
-	def done()
+impl Stream for List
+	def is_empty()
 		self.length() == 0
 	end
 end
@@ -94,7 +76,7 @@ impl for Complex
 		sqrt(self.re * self.re + self.im * self.im)
 	end
 end
-impl Printable for Complex
+impl for Complex
 	def to_string()
 		"{0} + {1}i".format([self.re, self.im])
 	end
@@ -104,21 +86,19 @@ struct Range
 	start
 	stop
 end
-impl Iterator for Range
-	def get()
+impl Stream for Range
+	def head()
 		self.start
 	end
-	def next()
+	def tail()
 		Range(self.start + 1, self.stop)
 	end
-	def done()
+	def is_empty()
 		self.start > self.stop
 	end
 end
-impl Printable for Range
+impl for Range
 	def to_string()
 		"{0}..{1}".format([self.start, self.stop])
 	end
 end
-
-print("Welcome to oops")W

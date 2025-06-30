@@ -18,5 +18,4 @@ type t =
 | Import of string * (string * string) list option
 | Export of string list
 | Throw of t
-
-(* val to_string: t -> string *)
+| Try of t * string * t

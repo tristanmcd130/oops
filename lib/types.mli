@@ -33,8 +33,7 @@ and trait = {
   provides: (string, value) Hashtbl.t;
 }
 and module' = {
-  name: string;
-  parent: module' option;
+  filename: string;
   vars: (string, value) Hashtbl.t;
   mutable exports: string list;
 }

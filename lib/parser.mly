@@ -45,6 +45,8 @@
 %token EXPORT
 %token AS
 %token THROW
+%token TRY
+%token CATCH
 %token <string> ID
 %token EOF
 %right CONS
@@ -70,7 +72,7 @@ stmt:
 	| STRUCT; n = ID; fs = ID*; END					{Assign (n, Struct (n, fs))}
 	| IMPL; t = exp?; FOR; ty = exp; ms = def*;	END	{Impl (t, ty, ms)}
 	| TRAIT; n = ID; rs = ID*; ps = def*; END		{Assign (n, Trait (n, rs, ps))}
-	| IMPORT; p = path; f = for_?					{Import (p, f)}
+	| IMPORT; s = STRING; f = for_?					{Import (s, f)}
 	| EXPORT; es = separated_list(COMMA, ID)		{Export es}
 	| THROW; e = exp								{Ast.Throw e}
 	| e = exp										{e}
@@ -98,14 +100,6 @@ fun_id:
 	| CONS		{"::"}
 	| n = ID	{n}
 
-path:
-	| n = ID; p = slash_path	{n ^ p}
-	| DOT; DOT; p = slash_path	{".." ^ p}
-
-slash_path:
-	|					{""}
-	| SLASH; p = path	{"/" ^ p}
-
 for_: FOR; ns = separated_list(COMMA, as_)	{ns}
 
 as_:
@@ -127,6 +121,7 @@ exp:
 	| IF; c = exp; THEN; t = block; es = elseif*; e = else_; END			{If ((c, t) :: es @ [e])}
 	| LET; a = separated_list(COMMA, assign); IN; b = block; END			{Call (Fun ("", List.map fst a, b), List.map snd a)}
 	| e = exp; DOT; f = ID													{Dot (e, f)}
+	| TRY; t = block; CATCH; n = ID; c = block; END							{Try (t, n, c)}
 	| LPAREN; e = exp; RPAREN												{e}
 
 map_entry: k = exp; COLON; v = exp	{(k, v)}

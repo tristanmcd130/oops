@@ -1,9 +1,17 @@
-def fib(x)
-	if x <= 0 then
-		1
-	else
-		fib(x - 1) + fib(x - 2)
+struct FibStream
+	c
+	n
+end
+impl Stream for FibStream
+	def head()
+		self.c
+	end
+	def tail()
+		FibStream(self.n, self.c + self.n)
+	end
+	def is_empty()
+		self.c >= 4000000
 	end
 end
 
-print(fib(30))
+FibStream(1, 1).for_each(print)

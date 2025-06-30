@@ -19,7 +19,7 @@ let rec to_string = function
 | Type t -> "<type " ^ t.name ^ ">"
 | Trait t -> "<trait " ^ t.name ^ ">"
 | Method (_, c) -> to_string (Closure c)
-| Module m -> "<module " ^ m.name ^ ">"
+| Module m -> "<module from " ^ m.filename ^ ">"
 let base_trait = {name = "Base"; requires = []; provides = [
   ("==", Primitive (fun [self; other] -> Bool (self = other)));
   ("!=", Primitive (fun [self; other] -> Bool (self <> other)));
@@ -48,6 +48,8 @@ let string_type = {name = "String"; fields = Hashtbl.create 0; methods = [
 ] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
 let list_type = {name = "List"; fields = Hashtbl.create 0; methods = [
   ("::", Primitive (fun [List self; other] -> List (other :: self)));
+  ("head", Primitive (fun [List (h :: _)] -> h));
+  ("tail", Primitive (fun [List (_ :: t)] -> List t));
 ] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
 let map_type = {name = "Map"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
 let function_type = {name = "Function"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}

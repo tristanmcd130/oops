@@ -6,12 +6,15 @@ let empty () = {code = [||]; constants = [||]; names = [||]; handlers = []}
 let rec find_first value = function
 | [||] -> None
 | a ->
-  if a.(0) = value then
-    Some 0
-  else
-    match Array.length a - 1 |> Array.sub a 1 |> find_first value with
-    | None -> None
-    | Some i -> Some (i + 1)
+  try
+    if a.(0) = value then
+      Some 0
+    else
+      match Array.length a - 1 |> Array.sub a 1 |> find_first value with
+      | None -> None
+      | Some i -> Some (i + 1)
+  with
+  | Invalid_argument _ -> None
 let add_opcode chunk opcode =
   chunk.code <- Array.append chunk.code [|opcode|];
   Array.length chunk.code - 1
@@ -101,6 +104,7 @@ let rec compile chunk scope module' = function
   List.iter (fun (n', ps, b) -> compile chunk scope module' (Fun (n', "self" :: ps, b)); add_opcode chunk (AddMethod (add_name chunk n')) |> ignore) ps
 | Import (p, ns) ->
   let n = String.split_on_char '/' p |> List.rev |> List.hd in
+  let n = String.sub n 0 (String.index n '.') in
   add_opcode chunk (Import (add_name chunk p)) |> ignore;
   (match (scope.parent, ns) with
   | (None, None) -> add_opcode chunk (SetGlobal (add_name chunk n)) |> ignore
@@ -111,6 +115,15 @@ let rec compile chunk scope module' = function
 | Throw e ->
   compile chunk scope module' e;
   add_opcode chunk Throw |> ignore
+| Try (t, n, c) ->
+  let s = length chunk in
+  compile chunk scope module' Null;
+  compile chunk scope module' t;
+  let e = add_opcode chunk (Jump 999) in
+  compile chunk scope module' (Fun ("", [n], c));
+  add_opcode chunk (Call 1) |> ignore;
+  chunk.code.(e) <- Jump (length chunk);
+  chunk.handlers <- (s, e) :: chunk.handlers
 and tail_compile chunk scope module' = function
 | Ast.Block [] -> ()
 | Block [x] -> tail_compile chunk scope module' x

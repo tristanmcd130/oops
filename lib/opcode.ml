@@ -18,7 +18,7 @@ type t =
 | Impl
 | BaseTrait
 | Import of int
-| PushExports
+| PushModule
 | DupDot of int
 | TailCall of int
 | Throw
@@ -43,7 +43,7 @@ let to_string = function
 | Impl -> "impl"
 | BaseTrait -> "base_trait"
 | Import i -> "import " ^ string_of_int i
-| PushExports -> "push_exports"
+| PushModule -> "push_module"
 | DupDot i -> "dup_dot " ^ string_of_int i
-| TailCall i -> "tall_call " ^ string_of_int i
+| TailCall i -> "tail_call " ^ string_of_int i
 | Throw -> "throw"

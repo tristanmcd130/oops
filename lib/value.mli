@@ -8,4 +8,14 @@ exception Runtime_error of t
 val type_of: t -> type'
 val dot: t -> string -> t
 val base_trait: trait
+val null_type: type'
+val bool_type: type'
+val number_type: type'
+val string_type: type'
+val list_type: type'
+val map_type: type'
+val function_type: type'
+val type_type: type'
+val trait_type: type'
+val module_type: type'
 val to_string: t -> string
