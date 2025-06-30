@@ -1,6 +1,5 @@
 type t = {
   parent: t option;
-  in_module: bool;
   locals: (string, int) Hashtbl.t;
   upvalues: (string, int * level) Hashtbl.t;
 }
@@ -9,7 +8,7 @@ and level =
 | Upvalue
 | Local
 
-let make parent in_module locals = {parent; in_module; locals = List.mapi (fun i n -> (n, i)) locals |> List.to_seq |> Hashtbl.of_seq; upvalues = Hashtbl.create 16}
+let make parent locals = {parent; locals = List.mapi (fun i n -> (n, i)) locals |> List.to_seq |> Hashtbl.of_seq; upvalues = Hashtbl.create 16}
 let rec get_upvalue_level scope name =
   match Hashtbl.find_opt scope.locals name with
   | None ->

@@ -19,6 +19,7 @@ let rec to_string = function
 | Type t -> "<type " ^ t.name ^ ">"
 | Trait t -> "<trait " ^ t.name ^ ">"
 | Method (_, c) -> to_string (Closure c)
+| Module m -> "<module " ^ m.name ^ ">"
 let base_trait = {name = "Base"; requires = []; provides = [
   ("==", Primitive (fun [self; other] -> Bool (self = other)));
   ("!=", Primitive (fun [self; other] -> Bool (self <> other)));
@@ -52,6 +53,7 @@ let map_type = {name = "Map"; fields = Hashtbl.create 0; methods = [] |> List.to
 let function_type = {name = "Function"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
 let type_type = {name = "Type"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
 let trait_type = {name = "Trait"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let module_type = {name = "Module"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
 let rec type_of = function
 | Null -> null_type
 | Bool _ -> bool_type
@@ -64,6 +66,7 @@ let rec type_of = function
 | Struct (t, _) -> t
 | Type _ -> type_type
 | Trait _ -> trait_type
+| Module _ -> module_type
 let bind_self self = function
 | Closure c -> Method (self, c)
 | Primitive p -> Primitive (fun args -> p (self :: args))
@@ -78,7 +81,7 @@ let get_method obj name =
   (match Hashtbl.find_opt (type_of obj).methods name with
   | None ->
     (match get_method_from_traits obj name (type_of obj).traits with
-    | None -> failwith ( to_string (Type (type_of obj)) ^ " has no field/method " ^ name)
+    | None -> failwith (to_string (Type (type_of obj)) ^ " has no field/method " ^ name)
     | Some m -> m)
   | Some m -> m) |> bind_self obj
 let dot obj name =
@@ -87,4 +90,9 @@ let dot obj name =
     (match Hashtbl.find_opt t.fields name with
     | None -> get_method obj name
     | Some i -> fs.(i))
+  | Module m ->
+    if List.mem name m.exports then
+      Hashtbl.find m.vars name
+    else
+      failwith (to_string (Module m) ^ " does not export " ^ name)
   | _ -> get_method obj name

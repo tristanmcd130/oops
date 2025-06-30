@@ -70,12 +70,6 @@ impl Iterator for String
 	end
 end
 
-impl for Module
-	def to_string()
-		"<module " + self.__name + ">"
-	end
-end
-
 struct Complex
 	re
 	im
@@ -127,4 +121,4 @@ impl Printable for Range
 	end
 end
 
-print("Welcome to oops")
+print("Welcome to oops")W

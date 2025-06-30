@@ -1,6 +1,5 @@
 type t = {
   mutable frames: frame list;
-  globals: (string, Value.t) Hashtbl.t;
 }
 and frame = {
   closure: Value.closure;
@@ -9,8 +8,7 @@ and frame = {
   locals: Value.t array;
 }
 
-let make globals = {frames = []; globals}
-let add_global vm value = Hashtbl.replace vm.globals value
+let make () = {frames = []}
 let push vm value =
   let top_frame = List.hd vm.frames in
   top_frame.stack <- value :: top_frame.stack
@@ -44,10 +42,10 @@ let step vm =
       done;
       push vm (Map map)
     | GetGlobal i ->
-      (match top_frame.closure.chunk.names.(i) |> Hashtbl.find_opt vm.globals with
+      (match Module.find top_frame.closure.module' top_frame.closure.chunk.names.(i) with
       | None -> failwith ("Undefined global variable " ^ top_frame.closure.chunk.names.(i))
       | Some v -> push vm v)
-    | SetGlobal i -> pop vm |> Hashtbl.replace vm.globals (top_frame.closure.chunk.names.(i))
+    | SetGlobal i -> Module.add top_frame.closure.module' top_frame.closure.chunk.names.(i) (pop vm)
     | GetLocal i ->
       (match top_frame.locals.(i) with
       | Cell c -> push vm !c
@@ -120,11 +118,13 @@ let step vm =
     | BaseTrait -> push vm (Trait Value.base_trait)
     | Import i ->
       let c = Chunk.empty () in
-      let s = Scope.make None true [] in
-      let b = Ast.Call (Fun ("", [], top_frame.closure.chunk.names.(i) |> open_in |> Lexing.from_channel |> Parser.program Lexer.read), []) in
-      Scope.resolve_locals s b;
-      Chunk.compile c s b;
-      push_frame vm {name = ""; chunk = c; num_args = 0; num_locals = Hashtbl.length s.locals; upvalues = [||]} []
+      let s = Scope.make None [] in
+      let m = Module.make top_frame.closure.chunk.names.(i) None in
+      let b = top_frame.closure.chunk.names.(i) ^ ".oops" |> open_in |> Lexing.from_channel |> Parser.program Lexer.read in
+      Chunk.compile c s m b;
+      Chunk.add_opcode c PushExports |> ignore;
+      push_frame vm {name = ""; module' = m; chunk = c; num_args = 0; num_locals = 0; upvalues = [||]} []
+    | PushExports -> Module top_frame.closure.module' |> push vm
     | DupDot i -> top_frame.closure.chunk.names.(i) |> Value.dot (List.hd top_frame.stack) |> push vm
     | TailCall i ->
       let f = pop vm in

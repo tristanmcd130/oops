@@ -18,6 +18,7 @@ type t =
 | Impl
 | BaseTrait
 | Import of int
+| PushExports
 | DupDot of int
 | TailCall of int
 | Throw
