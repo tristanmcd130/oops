@@ -130,9 +130,7 @@ let rec compile chunk scope module' = function
   chunk.code.(e) <- Jump (length chunk);
   chunk.handlers <- (s, e) :: chunk.handlers
 | Match (e, cs) ->
-  compile chunk scope module' e;
-  let rec compile_match = function
-  | Ast.Null -> 
+  failwith "not yet"
 and tail_compile chunk scope module' = function
 | Ast.Block [] -> ()
 | Block [x] -> tail_compile chunk scope module' x
