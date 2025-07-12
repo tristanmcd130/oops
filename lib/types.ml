@@ -1,5 +1,4 @@
 type value =
-| Null
 | Bool of bool
 | Number of float
 | String of string

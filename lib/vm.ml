@@ -16,7 +16,7 @@ let pop vm =
   let value = List.hd (List.hd vm.frames).stack in
   (List.hd vm.frames).stack <- List.tl (List.hd vm.frames).stack;
   value
-let push_frame vm closure args = vm.frames <- {closure; ip = 0; stack = []; locals = Array.make closure.num_locals Types.Null |> Array.append (Array.of_list args)} :: vm.frames
+let push_frame vm closure args = vm.frames <- {closure; ip = 0; stack = []; locals = Array.make closure.num_locals (Types.List []) |> Array.append (Array.of_list args)} :: vm.frames
 let pop_frame vm =
   let frame = List.hd vm.frames in
   vm.frames <- List.tl vm.frames;
@@ -118,7 +118,7 @@ let step vm =
     | Jump i -> top_frame.ip <- i
     | JumpIfFalse i ->
       (match pop vm with
-      | Null | Bool false | Number 0.0 | String "" | List [] -> top_frame.ip <- i
+      | Bool false | Number 0.0 | String "" | List [] -> top_frame.ip <- i
       | Map m when Hashtbl.length m = 0 -> top_frame.ip <- i
       | _ -> ())
     | GetField i -> Value.get_field (pop vm) top_frame.closure.chunk.names.(i) |> push vm
@@ -182,18 +182,18 @@ let step vm =
   else if List.length vm.frames = 1 then
     false
   else
-    ((match (pop_frame vm).stack with
-    | [] -> Types.Null
-    | x :: _ -> x) |> push vm;
+    (let r = pop vm in
+    pop_frame vm |> ignore;
+    push vm r;
     true)
 let call vm closure args =
   push_frame vm closure args;
   while step vm do () done;
   match vm.frames with
-  | [] -> Types.Null
+  | [] -> Types.List []
   | {stack = []} :: _ ->
     pop_frame vm |> ignore;
-    Null
+    List []
   | {stack = x :: _} :: _ ->
     pop_frame vm |> ignore;
     x

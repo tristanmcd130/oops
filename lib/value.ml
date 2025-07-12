@@ -5,7 +5,6 @@ type t = Types.value
 exception Runtime_error of t
 
 let rec to_string = function
-| Null -> "null"
 | Bool b -> string_of_bool b
 | Number n -> Printf.sprintf "%g" n
 | String s -> s
@@ -25,7 +24,6 @@ let base_trait = {name = "Base"; requires = []; provides = [
   ("!=", Primitive (fun [self; other] -> Bool (self <> other)));
   ("to_string", Primitive (fun [self] -> String (to_string self)));
 ] |> List.to_seq |> Hashtbl.of_seq}
-let null_type = {name = "Null"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
 let bool_type = {name = "Bool"; fields = Hashtbl.create 0; methods = [
   ("not", Primitive (fun [Bool self] -> Bool (not self)));
   ("and", Primitive (fun [Bool self; Bool other] -> Bool (self && other)));
@@ -57,7 +55,6 @@ let type_type = {name = "Type"; fields = Hashtbl.create 0; methods = [] |> List.
 let trait_type = {name = "Trait"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
 let module_type = {name = "Module"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
 let rec type_of = function
-| Null -> null_type
 | Bool _ -> bool_type
 | Number _ -> number_type
 | String _ -> string_type

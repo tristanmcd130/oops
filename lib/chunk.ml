@@ -32,11 +32,11 @@ let add_name chunk name =
   | Some i -> i
 let length chunk = Array.length chunk.code
 let rec compile chunk scope module' = function
-| Ast.Block [] -> ()
+| Ast.Block [] -> compile chunk scope module' (List [])
+| Block [x] -> compile chunk scope module' x
 | Block (x :: xs) ->
   compile chunk scope module' x;
   compile chunk scope module' (Block xs)
-| Null -> add_opcode chunk (GetConstant (add_constant chunk Null)) |> ignore
 | Bool b -> add_opcode chunk (GetConstant (add_constant chunk (Bool b))) |> ignore
 | Number n -> add_opcode chunk (GetConstant (add_constant chunk (Number n))) |> ignore
 | String s -> add_opcode chunk (GetConstant (add_constant chunk (String s))) |> ignore
@@ -122,7 +122,7 @@ let rec compile chunk scope module' = function
   add_opcode chunk Throw |> ignore
 | Try (t, n, c) ->
   let s = length chunk in
-  compile chunk scope module' Null;
+  (* compile chunk scope module' (List []); (* so that it is actually guaranteed to return a value *) *)
   compile chunk scope module' t;
   let e = add_opcode chunk (Jump 999) in
   compile chunk scope module' (Fun ("", [n], c));

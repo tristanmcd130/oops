@@ -1,6 +1,5 @@
 type t =
 | Block of t list
-| Null
 | Bool of bool
 | Number of float
 | String of string

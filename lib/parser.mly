@@ -1,4 +1,3 @@
-%token NULL
 %token <bool> BOOL
 %token <float> NUMBER
 %token <string> STRING
@@ -111,8 +110,7 @@ as_:
 	| n1 = ID; AS; n2 = ID	{(n1, n2)}
 
 exp:
-	| NULL																	{Ast.Null}
-	| b = BOOL																{Bool b}
+	| b = BOOL																{Ast.Bool b}
 	| n = NUMBER															{Number n}
 	| s = STRING															{String s}
 	| LBRACKET; l = separated_list(COMMA, exp); RBRACKET					{List l}
@@ -154,7 +152,7 @@ map_entry: k = exp; COLON; v = exp	{(k, v)}
 elseif: ELSEIF; t = exp; THEN; b = block	{(t, b)}
 
 else_:
-	|					{(Ast.Bool true, Ast.Null)}
+	|					{(Ast.Bool true, Ast.List [])}
 	| ELSE; e = block	{(Ast.Bool true, e)}
 
 case_: CASE; p = exp; THEN; b = block	{(p, b)}

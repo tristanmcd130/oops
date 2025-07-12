@@ -3,9 +3,8 @@ open Types
 type t = module'
 
 let globals = {filename = ""; vars = [
-  ("print", Primitive (fun [x] -> x |> Value.to_string |> print_endline; Null));
+  ("print", Primitive (fun [x] -> x |> Value.to_string |> print_endline; List []));
   ("Base", Trait Value.base_trait);
-  ("Null", Type Value.null_type);
   ("Bool", Type Value.bool_type);
   ("Number", Type Value.number_type);
   ("String", Type Value.string_type);

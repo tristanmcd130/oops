@@ -13,7 +13,6 @@ let id = ['a'-'z' 'A'-'Z' '_'] ['0'-'9' 'a'-'z' 'A'-'Z' '_']*
 rule read = parse
 | ws		{read lexbuf}
 | '\n'		{new_line lexbuf; read lexbuf}
-| "null"	{NULL}
 | "true"	{BOOL true}
 | "false"	{BOOL false}
 | num		{NUMBER (lexbuf |> lexeme |> float_of_string)}

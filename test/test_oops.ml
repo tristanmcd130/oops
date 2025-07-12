@@ -13,17 +13,16 @@ let make_error_test ?(module_vars = []) string error _ =
     string |> Lexing.from_string |> Parser.program Lexer.read |> Chunk.compile chunk (Scope.make None []) module';
     Vm.call (Vm.make ()) (Chunk.to_closure chunk module') [])
 let tests = "tests" >::: [
-  "empty" >:: make_test "" Null;
+  "empty" >:: make_test "" (List []);
   "block" >:: make_test "3 5 -6" (Number (-6.0));
-  "null" >:: make_test "null" Null;
   "true" >:: make_test "true" (Bool true);
   "false" >:: make_test "false" (Bool false);
   "number" >:: make_test "3.4e-5" (Number 3.4e-5);
   "string" >:: make_test "\"a\"" (String "a");
   "escaped string" >:: make_test "\"\\tI said, \\\"Hello world!\\\"\\n\"" (String "\tI said, \"Hello world!\"\n");
   "unterminated string" >:: make_error_test "\"aaaaaaa" (Failure "Unterminated string");
-  "list" >:: make_test "[1, null, \"b\"]" (List [Number 1.0; Null; String "b"]);
-  "map" >:: make_test "{1: false, null: [], [4]: \"b\"}" (Map ([(Types.Number 1.0, Types.Bool false); (Null, List []); (List [Number 4.0], String "b")] |> List.to_seq |> Hashtbl.of_seq)); (* change 4 to 3 and this test fails for some reason *)
+  "list" >:: make_test "[1, [], \"b\"]" (List [Number 1.0; List []; String "b"]);
+  "map" >:: make_test "{1: false, true: [], [4]: \"b\"}" (Map ([(Types.Number 1.0, Types.Bool false); (Bool true, List []); (List [Number 4.0], String "b")] |> List.to_seq |> Hashtbl.of_seq)); (* change 4 to 3 and this test fails for some reason *)
   "unexpected char" >:: make_error_test "@" (Failure "Unexpected character @");
   "global" >:: make_test ~module_vars: [("t", Number 5.0)] "t" (Number 5.0);
   "undefined global" >:: make_error_test "t" (Failure "Undefined global variable t");
@@ -53,7 +52,7 @@ let tests = "tests" >::: [
   "upvalue" >:: make_test "(fun(x) y = 5 fun() x + y end end)(1)()" (Number 6.0);
   "primitive" >:: make_test ~module_vars: [("add_one", Primitive (fun [Number x] -> Number (x +. 1.0)))] "add_one(44)" (Number 45.0);
   "if" >:: make_test "if true then 1 else 2 end" (Number 1.0);
-  "if with no else" >:: make_test "if false then 1 end" Null;
+  "if with no else" >:: make_test "if false then 1 end" (List []);
   "elseif" >:: make_test "if false then 1 elseif true then 2 else 3 end" (Number 2.0);
   "convoluted elseif" >:: make_test
     "if false then
@@ -92,7 +91,7 @@ let tests = "tests" >::: [
     f()(6)" (Bool true);
   "let" >:: make_test "let x = 3, y = 0 in x + y end" (Number 3.0);
   "let out of scope" >:: make_error_test "let x = 3 in x end x" (Failure "Undefined global variable x");
-  "struct" >:: make_test "struct A a b end" Null;
+  "struct" >:: make_test "struct A a b end" (List []);
   "struct with bad args" >:: make_error_test "struct A a b end A(56)" (Failure "Constructor for <type A> expected 2 arguments, but received 1");
   "dot" >:: make_test "struct A a b end A(5, 6).b" (Number 6.0);
   "dot nonexistent field" >:: make_error_test "struct A a b end A(5, 6).c" (Failure "<type A> has no field/method c");
@@ -150,9 +149,9 @@ let tests = "tests" >::: [
   "import for as" >:: make_test "import \"import_test.oops\" for a as b b" (Number 100.0);
   "import as" >:: make_test "import \"import_test.oops\" as m m.a" (Number 100.0);
   "tail call" >:: make_test "def f(x) if x <= 0 then true else f(x - 1) end end f(1e4)" (Bool true);
-  "throw" >:: make_test "throw 6" Null;
+  "throw" >:: make_test "throw 6" (List []);
   "try" >:: make_test "try throw 8 catch n n end" (Number 8.0);
-  "empty try" >:: make_test "fun(x, y) x == null end(try catch n n end, 5)" (Bool true);
+  "empty try" >:: make_test "fun(x, y) x == [] end(try catch n n end, 5)" (Bool true);
   "try in catch" >:: make_test
   "try
     throw 5

@@ -10,7 +10,7 @@ let run_from_channel channel =
   with
   | e ->
     prerr_endline ("Uncaught primitive exception: " ^ Printexc.to_string e ^ "\n" ^ Printexc.get_backtrace ());
-    Null
+    List []
 let rec repl line_num =
   Printf.printf "%d> " line_num;
   flush stdout;
