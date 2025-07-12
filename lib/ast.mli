@@ -13,9 +13,11 @@ type t =
 | If of (t * t) list
 | Struct of string * string list
 | Dot of t * string
+| DotAssign of t * string * t
 | Impl of t option * t * (string * string list * t) list
 | Trait of string * string list * (string * string list * t) list
-| Import of string * (string * string) list option
+| Import of string * string option * (string * string) list option
 | Export of string list
 | Throw of t
 | Try of t * string * t
+| Match of t * (t * t) list

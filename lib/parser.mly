@@ -47,6 +47,8 @@
 %token THROW
 %token TRY
 %token CATCH
+%token MATCH
+%token CASE
 %token <string> ID
 %token EOF
 %right CONS
@@ -70,9 +72,11 @@ stmt:
 	| a = assign									{match a with (n, v) -> Assign (n, v)}
 	| d = def										{match d with (n, ps, b) -> Assign (n, Fun (n, ps, b))}
 	| STRUCT; n = ID; fs = ID*; END					{Assign (n, Struct (n, fs))}
+	| o = exp; DOT; f = ID; EQUAL; v = exp			{DotAssign (o, f, v)}
 	| IMPL; t = exp?; FOR; ty = exp; ms = def*;	END	{Impl (t, ty, ms)}
 	| TRAIT; n = ID; rs = ID*; ps = def*; END		{Assign (n, Trait (n, rs, ps))}
-	| IMPORT; s = STRING; f = for_?					{Import (s, f)}
+	| IMPORT; s = STRING; f = for_?					{Import (s, None, f)}
+	| IMPORT; s = STRING; AS; n = ID				{Import (s, Some n, None)}
 	| EXPORT; es = separated_list(COMMA, ID)		{Export es}
 	| THROW; e = exp								{Ast.Throw e}
 	| e = exp										{e}
@@ -120,8 +124,9 @@ exp:
 	| f = exp; LPAREN; a = separated_list(COMMA, exp); RPAREN				{Call (f, a)}
 	| IF; c = exp; THEN; t = block; es = elseif*; e = else_; END			{If ((c, t) :: es @ [e])}
 	| LET; a = separated_list(COMMA, assign); IN; b = block; END			{Call (Fun ("", List.map fst a, b), List.map snd a)}
-	| e = exp; DOT; f = ID													{Dot (e, f)}
+	| o = exp; DOT; f = ID													{Dot (o, f)}
 	| TRY; t = block; CATCH; n = ID; c = block; END							{Try (t, n, c)}
+	| MATCH; e = exp; cs = case_*; END										{Match (e, cs)}
 	| LPAREN; e = exp; RPAREN												{e}
 
 map_entry: k = exp; COLON; v = exp	{(k, v)}
@@ -151,3 +156,5 @@ elseif: ELSEIF; t = exp; THEN; b = block	{(t, b)}
 else_:
 	|					{(Ast.Bool true, Ast.Null)}
 	| ELSE; e = block	{(Ast.Bool true, e)}
+
+case_: CASE; p = exp; THEN; b = block	{(p, b)}

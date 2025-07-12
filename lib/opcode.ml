@@ -13,13 +13,14 @@ type t =
 | DerefUpvalue of int
 | Jump of int
 | JumpIfFalse of int
-| Dot of int
+| GetField of int
+| SetField of int
 | AddMethod of int
 | Impl
 | BaseTrait
 | Import of int
 | PushModule
-| DupDot of int
+| ImportFor of int
 | TailCall of int
 | Throw
 
@@ -38,12 +39,13 @@ let to_string = function
 | DerefUpvalue i -> "deref_upvalue " ^ string_of_int i
 | Jump i -> "jump " ^ string_of_int i
 | JumpIfFalse i -> "jump_if_false " ^ string_of_int i
-| Dot i -> "dot " ^ string_of_int i
+| GetField i -> "get_field " ^ string_of_int i
+| SetField i -> "set_field " ^ string_of_int i
 | AddMethod i -> "add_method " ^ string_of_int i
 | Impl -> "impl"
 | BaseTrait -> "base_trait"
 | Import i -> "import " ^ string_of_int i
 | PushModule -> "push_module"
-| DupDot i -> "dup_dot " ^ string_of_int i
+| ImportFor i -> "import_for " ^ string_of_int i
 | TailCall i -> "tail_call " ^ string_of_int i
 | Throw -> "throw"

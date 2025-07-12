@@ -121,7 +121,10 @@ let step vm =
       | Null | Bool false | Number 0.0 | String "" | List [] -> top_frame.ip <- i
       | Map m when Hashtbl.length m = 0 -> top_frame.ip <- i
       | _ -> ())
-    | Dot i -> top_frame.closure.chunk.names.(i) |> Value.dot (pop vm) |> push vm
+    | GetField i -> Value.get_field (pop vm) top_frame.closure.chunk.names.(i) |> push vm
+    | SetField i ->
+      let v = pop vm in
+      Value.set_field (pop vm) top_frame.closure.chunk.names.(i) v
     | AddMethod i ->
       let m = pop vm in
       Hashtbl.replace (match List.hd top_frame.stack with
@@ -150,7 +153,7 @@ let step vm =
       Chunk.add_opcode c PushModule |> ignore;
       push_frame vm (Chunk.to_closure c m) []
     | PushModule -> Module top_frame.closure.module' |> push vm
-    | DupDot i -> top_frame.closure.chunk.names.(i) |> Value.dot (List.hd top_frame.stack) |> push vm
+    | ImportFor i -> top_frame.closure.chunk.names.(i) |> Value.get_field (List.hd top_frame.stack) |> push vm
     | TailCall i ->
       let f = pop vm in
       let a = ref [] in

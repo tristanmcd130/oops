@@ -96,10 +96,12 @@ let tests = "tests" >::: [
   "struct with bad args" >:: make_error_test "struct A a b end A(56)" (Failure "Constructor for <type A> expected 2 arguments, but received 1");
   "dot" >:: make_test "struct A a b end A(5, 6).b" (Number 6.0);
   "dot nonexistent field" >:: make_error_test "struct A a b end A(5, 6).c" (Failure "<type A> has no field/method c");
+  "dot assign" >:: make_test ~module_vars: [("A", Type {name = "A"; fields = [("a", 0); ("b", 1)] |> List.to_seq |> Hashtbl.of_seq; methods = Hashtbl.create 0; traits = []})] "a = A(5, 6) a.b = 8.5 [a.a, a.b]" (List [Number 5.0; Number 8.5]);
+  "dot assign nonexistent field" >:: make_error_test ~module_vars: [("A", Type {name = "A"; fields = [("a", 0); ("b", 1)] |> List.to_seq |> Hashtbl.of_seq; methods = Hashtbl.create 0; traits = []})] "a = A(5, 6) a.c = 8.5" (Failure "<type A> has no field c");
   "impl for" >:: make_test "struct A a b end impl for A def f() self.a + self.b end end A(5, 6).f()" (Number 11.0);
   "bound primitive" >:: make_test ~module_vars: [("A", Type {name = "A"; fields = [("a", 0); ("b", 1)] |> List.to_seq |> Hashtbl.of_seq; methods = [("f", Types.Primitive (fun [self; Number x] ->
-    let Number a = Value.dot self "a" in
-    let Number b = Value.dot self "b" in
+    let Number a = Value.get_field self "a" in
+    let Number b = Value.get_field self "b" in
     Number (a +. b +. x)))] |> List.to_seq |> Hashtbl.of_seq; traits = []})] "f = A(2, 4).f f(7)" (Number 13.0);
   "impl" >:: make_test
     "trait T
@@ -146,6 +148,7 @@ let tests = "tests" >::: [
   "import for" >:: make_test "import \"import_test.oops\" for a a" (Number 100.0);
   "import for no module" >:: make_error_test "import \"import_test.oops\" for a import_test" (Failure "Undefined global variable import_test");
   "import for as" >:: make_test "import \"import_test.oops\" for a as b b" (Number 100.0);
+  "import as" >:: make_test "import \"import_test.oops\" as m m.a" (Number 100.0);
   "tail call" >:: make_test "def f(x) if x <= 0 then true else f(x - 1) end end f(1e4)" (Bool true);
   "throw" >:: make_test "throw 6" Null;
   "try" >:: make_test "try throw 8 catch n n end" (Number 8.0);
@@ -161,5 +164,6 @@ let tests = "tests" >::: [
     end
   end" (Number 7.0);
   "try no error" >:: make_test "try 4 catch n n + 2 end" (Number 4.0);
+  "match literal" >:: make_test "match 4 case 4 then \"b\" end" (String "b");
 ]
 let _ = run_test_tt_main tests

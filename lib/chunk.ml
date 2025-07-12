@@ -89,9 +89,13 @@ let rec compile chunk scope module' = function
     length chunk in
   compile_if bs |> ignore
 | Struct (n, fs) -> add_opcode chunk (GetConstant (add_constant chunk (Type {name = n; fields = fs |> List.mapi (fun i n -> (n, i)) |> List.to_seq |> Hashtbl.of_seq; methods = Hashtbl.create 16; traits = [Value.base_trait]}))) |> ignore
-| Dot (e, f) ->
-  compile chunk scope module' e;
-  add_opcode chunk (Dot (add_name chunk f)) |> ignore
+| Dot (o, f) ->
+  compile chunk scope module' o;
+  add_opcode chunk (GetField (add_name chunk f)) |> ignore
+| DotAssign (o, f, v) ->
+  compile chunk scope module' o;
+  compile chunk scope module' v;
+  add_opcode chunk (SetField (add_name chunk f)) |> ignore
 | Impl (t, ty, ms) ->
   compile chunk scope module' ty;
   List.iter (fun (n, ps, b) -> compile chunk scope module' (Fun (n, "self" :: ps, b)); add_opcode chunk (AddMethod (add_name chunk n)) |> ignore) ms;
@@ -102,15 +106,16 @@ let rec compile chunk scope module' = function
 | Trait (n, rs, ps) ->
   add_opcode chunk (GetConstant (add_constant chunk (Trait {name = n; requires = rs; provides = Hashtbl.create 16}))) |> ignore;
   List.iter (fun (n', ps, b) -> compile chunk scope module' (Fun (n', "self" :: ps, b)); add_opcode chunk (AddMethod (add_name chunk n')) |> ignore) ps
-| Import (p, ns) ->
-  let n = String.split_on_char '/' p |> List.rev |> List.hd in
-  let n = String.sub n 0 (String.index n '.') in
-  add_opcode chunk (Import (add_name chunk p)) |> ignore;
-  (match (scope.parent, ns) with
-  | (None, None) -> add_opcode chunk (SetGlobal (add_name chunk n)) |> ignore
-  | (None, Some ns') -> List.iter (fun (n1, n2) -> add_opcode chunk (DupDot (add_name chunk n1)) |> ignore; add_opcode chunk (SetGlobal (add_name chunk n2)) |> ignore) ns'
-  | (Some _, None) -> add_opcode chunk (SetLocal (Scope.add_local scope n)) |> ignore
-  | (Some _, Some ns') -> List.iter (fun (n1, n2) -> add_opcode chunk (DupDot (add_name chunk n1)) |> ignore; add_opcode chunk (SetLocal (Scope.add_local scope n2)) |> ignore) ns')
+| Import (f, n, ns) ->
+  let n = match n with
+  | None ->
+    let n' = String.split_on_char '/' f |> List.rev |> List.hd in
+    String.sub n' 0 (String.index n' '.')
+  | Some n' -> n' in
+  add_opcode chunk (Import (add_name chunk f)) |> ignore;
+  (match ns with
+  | None -> add_opcode chunk (SetGlobal (add_name chunk n)) |> ignore
+  | Some ns' -> List.iter (fun (n1, n2) -> add_opcode chunk (ImportFor (add_name chunk n1)) |> ignore; add_opcode chunk (SetGlobal (add_name chunk n2)) |> ignore) ns')
 | Export ns -> Module.export module' ns
 | Throw e ->
   compile chunk scope module' e;
@@ -124,6 +129,10 @@ let rec compile chunk scope module' = function
   add_opcode chunk (Call 1) |> ignore;
   chunk.code.(e) <- Jump (length chunk);
   chunk.handlers <- (s, e) :: chunk.handlers
+| Match (e, cs) ->
+  compile chunk scope module' e;
+  let rec compile_match = function
+  | Ast.Null -> 
 and tail_compile chunk scope module' = function
 | Ast.Block [] -> ()
 | Block [x] -> tail_compile chunk scope module' x

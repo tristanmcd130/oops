@@ -3,51 +3,51 @@ export empty
 trait RBTree
 	def member(x)
 		match self
-		| E() -> false
-		| T(_, a, y, b) ->
-			if x < y then
-				a.member(x)
-			elseif x == y then
-				true
-			else
-				b.member(x)
-			end
+			case E() then false
+			case T(_, a, y, b) then
+				if x < y then
+					a.member(x)
+				elseif x == y then
+					true
+				else
+					b.member(x)
+				end
 		end
 	end
 	def insert(x)
 		def ins(t)
 			match t
-			| E() -> T("R", E(), x, E())
-			| T(color, a, y, b) ->
-				if x < y then
-					T(color, ins(a), y, b).balance()
-				elseif x == y then
-					t
-				else
-					T(color, a, y, ins(b)).balance()
-				end
+				case E() then T("R", E(), x, E())
+				case T(color, a, y, b) then
+					if x < y then
+						T(color, ins(a), y, b).balance()
+					elseif x == y then
+						t
+					else
+						T(color, a, y, ins(b)).balance()
+					end
 			end
 		end
 		def make_black(t)
 			match t
-			| T(_, a, y, b) -> T("B", a, y, b)
+				case T(_, a, y, b) then T("B", a, y, b)
 			end
 		end
 		make_black(ins(self))
 	end
 	def balance()
 		match self
-		| T("B", T("R", T("R", a, x, b), y, c), z, d)
-		or T("B", T("R", a, x, T("R", b, y, c)), z, d)
-		or T("B", a, x, T("R", T("R", b, y, c), z, d))
-		or T("B", a, x, T("R", b, y, T("R", c, z, d))) -> T("R", T("B", a, x, b), y, T("B", c, z, d))
-		| _ -> self
+			case T("B", T("R", T("R", a, x, b), y, c), z, d)
+				or T("B", T("R", a, x, T("R", b, y, c)), z, d)
+				or T("B", a, x, T("R", T("R", b, y, c), z, d))
+				or T("B", a, x, T("R", b, y, T("R", c, z, d))) then T("R", T("B", a, x, b), y, T("B", c, z, d))
+			case _ then self
 		end
 	end
 	def to_string()
 		match self
-		| E() -> ""
-		| T(color, a, y, b) -> "{0}[{1}{0} {2} {3}{0}][0m".format([if color == "R" then "[91m" else "[90m" end, a, y, b])
+			case E() then ""
+			case T(color, a, y, b) then "{0}[{1}{0} {2} {3}{0}][0m".format([if color == "R" then "[91m" else "[90m" end, a, y, b])
 		end
 	end
 end

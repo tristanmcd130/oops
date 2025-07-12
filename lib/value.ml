@@ -86,7 +86,7 @@ let get_method obj name =
     | None -> failwith (to_string (Type (type_of obj)) ^ " has no field/method " ^ name)
     | Some m -> m)
   | Some m -> m) |> bind_self obj
-let dot obj name =
+let get_field obj name =
   match obj with
   | Struct (t, fs) ->
     (match Hashtbl.find_opt t.fields name with
@@ -98,3 +98,15 @@ let dot obj name =
     else
       failwith (to_string (Module m) ^ " does not export " ^ name)
   | _ -> get_method obj name
+let set_field obj name value =
+  match obj with
+  | Struct (t, fs) ->
+    (match Hashtbl.find_opt t.fields name with
+    | None -> failwith (to_string (Type t) ^ " has no field " ^ name)
+    | Some i -> Array.set fs i value)
+  | Module m ->
+    if List.mem name m.exports then
+      Hashtbl.replace m.vars name value
+    else
+      failwith (to_string (Module m) ^ " does not export " ^ name)
+  | _ -> failwith (to_string obj ^ " does not have fields")

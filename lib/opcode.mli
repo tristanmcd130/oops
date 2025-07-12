@@ -13,13 +13,14 @@ type t =
 | DerefUpvalue of int
 | Jump of int
 | JumpIfFalse of int
-| Dot of int
+| GetField of int
+| SetField of int
 | AddMethod of int
 | Impl
 | BaseTrait
 | Import of int
 | PushModule
-| DupDot of int
+| ImportFor of int
 | TailCall of int
 | Throw
 
