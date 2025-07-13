@@ -140,7 +140,7 @@ let step vm =
             ty'.traits <- t' :: ty'.traits
           else
             failwith (Value.to_string (Type ty') ^ " does not fully implement " ^ Value.to_string (Trait t') ^ ": missing " ^ String.concat ", " (List.filter (fun x -> not (ty'.methods |> Hashtbl.to_seq_keys |> List.of_seq |> List.mem x)) t'.requires)))
-      | (Trait _, x) -> failwith ("Cannot implement for " ^ Value.to_string x ^ ": it is not a type")
+      | (Trait t', x) -> failwith ("Cannot implement for " ^ Value.to_string x ^ ": it is not a type")
       | (x, Type _) -> failwith ("Cannot implement " ^ Value.to_string x ^ ": it is not a trait")
       | _ -> failwith "How did you even get here?")
     | BaseTrait -> push vm (Trait Value.base_trait)

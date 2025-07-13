@@ -15,7 +15,7 @@ type t =
 | DotAssign of t * string * t
 | Impl of t option * t * (string * string list * t) list
 | Trait of string * string list * (string * string list * t) list
-| Import of string * string option * (string * string) list option
+| Import of string * (string option, (string * string) list) Either.t
 | Export of string list
 | Throw of t
 | Try of t * string * t

@@ -74,8 +74,9 @@ stmt:
 	| o = exp; DOT; f = ID; EQUAL; v = exp			{DotAssign (o, f, v)}
 	| IMPL; t = exp?; FOR; ty = exp; ms = def*;	END	{Impl (t, ty, ms)}
 	| TRAIT; n = ID; rs = ID*; ps = def*; END		{Assign (n, Trait (n, rs, ps))}
-	| IMPORT; s = STRING; f = for_?					{Import (s, None, f)}
-	| IMPORT; s = STRING; AS; n = ID				{Import (s, Some n, None)}
+	| IMPORT; s = STRING							{Import (s, Left None)}
+	| IMPORT; s = STRING; AS; n = ID				{Import (s, Left (Some n))}
+	| IMPORT; s = STRING; f = for_					{Import (s, Right f)}
 	| EXPORT; es = separated_list(COMMA, ID)		{Export es}
 	| THROW; e = exp								{Ast.Throw e}
 	| e = exp										{e}
