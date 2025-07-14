@@ -1,1 +1,0 @@
-get rid of globals: associate every closure with a module, which can have parents. the "root" parent of every module is the true global module where print, types, etc. are stored.

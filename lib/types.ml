@@ -30,6 +30,7 @@ and trait = {
   name: string;
   requires: string list;
   provides: (string, value) Hashtbl.t;
+  mutable traits: trait list;
 }
 and module' = {
   filename: string;

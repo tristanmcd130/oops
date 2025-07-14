@@ -8,6 +8,7 @@ exception Runtime_error of t
 val type_of: t -> type'
 val get_field: t -> string -> t
 val set_field: t -> string -> t -> unit
+val impl: trait -> t -> unit
 val base_trait: trait
 val bool_type: type'
 val number_type: type'

@@ -104,7 +104,7 @@ let rec compile chunk scope module' = function
   | Some t' -> compile chunk scope module' t');
   add_opcode chunk Impl |> ignore
 | Trait (n, rs, ps) ->
-  add_opcode chunk (GetConstant (add_constant chunk (Trait {name = n; requires = rs; provides = Hashtbl.create 16}))) |> ignore;
+  add_opcode chunk (GetConstant (add_constant chunk (Trait {name = n; requires = rs; provides = Hashtbl.create 16; traits = []}))) |> ignore;
   List.iter (fun (n', ps, b) -> compile chunk scope module' (Fun (n', "self" :: ps, b)); add_opcode chunk (AddMethod (add_name chunk n')) |> ignore) ps
 | Import (f, o) ->
   add_opcode chunk (Import (add_name chunk f)) |> ignore;
@@ -117,22 +117,12 @@ let rec compile chunk scope module' = function
     | Some n' -> n' in
     add_opcode chunk (SetGlobal (add_name chunk n)) |> ignore
   | Right ns (* for *) -> List.iter (fun (n1, n2) -> add_opcode chunk (ImportFor (add_name chunk n1)) |> ignore; add_opcode chunk (SetGlobal (add_name chunk n2)) |> ignore) ns)
-  (* let n = match n with
-  | None ->
-    let n' = String.split_on_char '/' f |> List.rev |> List.hd in
-    String.sub n' 0 (String.index n' '.')
-  | Some n' -> n' in
-  add_opcode chunk (Import (add_name chunk f)) |> ignore;
-  (match ns with
-  | None -> add_opcode chunk (SetGlobal (add_name chunk n)) |> ignore
-  | Some ns' -> List.iter (fun (n1, n2) -> add_opcode chunk (ImportFor (add_name chunk n1)) |> ignore; add_opcode chunk (SetGlobal (add_name chunk n2)) |> ignore) ns') *)
 | Export ns -> Module.export module' ns
 | Throw e ->
   compile chunk scope module' e;
   add_opcode chunk Throw |> ignore
 | Try (t, n, c) ->
   let s = length chunk in
-  (* compile chunk scope module' (List []); (* so that it is actually guaranteed to return a value *) *)
   compile chunk scope module' t;
   let e = add_opcode chunk (Jump 999) in
   compile chunk scope module' (Fun ("", [n], c));

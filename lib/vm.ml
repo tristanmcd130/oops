@@ -21,7 +21,6 @@ let pop_frame vm =
   let frame = List.hd vm.frames in
   vm.frames <- List.tl vm.frames;
   frame
-let subset a b = List.for_all (fun x -> List.mem x b) a
 let throw vm error =
   let rec find_handler ip = function
   | [] -> None
@@ -132,17 +131,9 @@ let step vm =
       | Trait t -> t.provides
       | x -> failwith ("Cannot add methods to " ^ Value.to_string x)) top_frame.closure.chunk.names.(i) m
     | Impl ->
-      let t = pop vm in
-      (match (t, pop vm) with
-      | (Trait t', Type ty') ->
-        if not (List.mem t' ty'.traits) then
-          (if subset t'.requires (ty'.methods |> Hashtbl.to_seq_keys |> List.of_seq) then
-            ty'.traits <- t' :: ty'.traits
-          else
-            failwith (Value.to_string (Type ty') ^ " does not fully implement " ^ Value.to_string (Trait t') ^ ": missing " ^ String.concat ", " (List.filter (fun x -> not (ty'.methods |> Hashtbl.to_seq_keys |> List.of_seq |> List.mem x)) t'.requires)))
-      | (Trait t', x) -> failwith ("Cannot implement for " ^ Value.to_string x ^ ": it is not a type")
-      | (x, Type _) -> failwith ("Cannot implement " ^ Value.to_string x ^ ": it is not a trait")
-      | _ -> failwith "How did you even get here?")
+      (match pop vm with
+      | Trait t -> Value.impl t (pop vm)
+      | x -> failwith ("Cannot implement " ^ Value.to_string x ^ ": it is not a trait"))
     | BaseTrait -> push vm (Trait Value.base_trait)
     | Import i ->
       let c = Chunk.empty () in

@@ -140,6 +140,40 @@ let tests = "tests" >::: [
         self.a
       end
     end" (Failure "<type A> does not fully implement <trait T>: missing g");
+  "impl for trait" >:: make_test
+    "trait T
+      f
+      g
+      def h()
+        self.f() + self.g()
+      end
+    end
+    trait U
+      i
+      j
+    end
+    impl T for U
+      def f()
+        self.i() * 2
+      end
+      def g()
+        self.j() + 1
+      end
+    end
+    struct A
+      a
+      b
+    end
+    impl U for A
+      def i()
+        self.a
+      end
+      def j()
+        self.b
+      end
+    end
+    A(2, 3).h()" (Number 8.0);
+  "impl struct" >:: make_error_test "struct A a b end impl A for A end" (Failure "Cannot implement <type A>: it is not a trait");
   "operator overloading" >:: make_test "struct A a b end impl for A def +(other) A(self.a + other.a, self.b + other.b) end end (A(2, 3) + A(7, 4)).a" (Number 9.0);
   "import" >:: make_test "import \"import_test.oops\" import_test.a" (Number 100.0);
   "import private" >:: make_error_test "import \"import_test.oops\" import_test.b" (Failure "<module from import_test.oops> does not export b");

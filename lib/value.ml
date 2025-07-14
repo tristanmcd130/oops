@@ -23,7 +23,7 @@ let base_trait = {name = "Base"; requires = []; provides = [
   ("==", Primitive (fun [self; other] -> Bool (self = other)));
   ("!=", Primitive (fun [self; other] -> Bool (self <> other)));
   ("to_string", Primitive (fun [self] -> String (to_string self)));
-] |> List.to_seq |> Hashtbl.of_seq}
+] |> List.to_seq |> Hashtbl.of_seq; traits = []}
 let bool_type = {name = "Bool"; fields = Hashtbl.create 0; methods = [
   ("not", Primitive (fun [Bool self] -> Bool (not self)));
   ("and", Primitive (fun [Bool self; Bool other] -> Bool (self && other)));
@@ -70,16 +70,19 @@ let bind_self self = function
 | Closure c -> Method (self, c)
 | Primitive p -> Primitive (fun args -> p (self :: args))
 | x -> failwith ("Cannot bind self in " ^ to_string x)
-let rec get_method_from_traits obj name = function
+let rec get_method_from_traits name = function
 | [] -> None
 | t :: ts ->
   match Hashtbl.find_opt t.provides name with
-  | None -> get_method_from_traits obj name ts
-  | Some m -> Some m
+  | None ->
+    (match get_method_from_traits name t.traits with
+    | None -> get_method_from_traits name ts
+    | m -> m)
+  | m -> m
 let get_method obj name =
   (match Hashtbl.find_opt (type_of obj).methods name with
   | None ->
-    (match get_method_from_traits obj name (type_of obj).traits with
+    (match get_method_from_traits name (type_of obj).traits with
     | None -> failwith (to_string (Type (type_of obj)) ^ " has no field/method " ^ name)
     | Some m -> m)
   | Some m -> m) |> bind_self obj
@@ -107,3 +110,18 @@ let set_field obj name value =
     else
       failwith (to_string (Module m) ^ " does not export " ^ name)
   | _ -> failwith (to_string obj ^ " does not have fields")
+let subset a b = List.for_all (fun x -> List.mem x b) a
+let impl trait = function
+| Type ty ->
+  if not (List.mem trait ty.traits) then
+    (if subset trait.requires (ty.methods |> Hashtbl.to_seq_keys |> List.of_seq) then
+      ty.traits <- trait :: ty.traits
+    else
+      failwith (to_string (Type ty) ^ " does not fully implement " ^ to_string (Trait trait) ^ ": missing " ^ String.concat ", " (List.filter (fun x -> not (ty.methods |> Hashtbl.to_seq_keys |> List.of_seq |> List.mem x)) trait.requires)))
+| Trait t ->
+  if not (List.mem trait t.traits) then
+    (if subset trait.requires (t.provides |> Hashtbl.to_seq_keys |> List.of_seq) then
+      t.traits <- trait :: t.traits
+    else
+      failwith (to_string (Trait t) ^ " does not fully implement " ^ to_string (Trait trait) ^ ": missing " ^ String.concat ", " (List.filter (fun x -> not (t.provides |> Hashtbl.to_seq_keys |> List.of_seq |> List.mem x)) trait.requires)))
+| x -> failwith ("Cannot implement for " ^ to_string x ^ ": it is not a trait or a type")
