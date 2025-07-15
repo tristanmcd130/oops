@@ -13,6 +13,7 @@ type t =
 | DerefUpvalue of int
 | Jump of int
 | JumpIfFalse of int
+| SetDefault of int
 | GetField of int
 | SetField of int
 | AddMethod of int
@@ -23,6 +24,7 @@ type t =
 | ImportFor of int
 | TailCall of int
 | Throw
+| GetType
 
 let to_string = function
 | GetConstant i -> "get_constant " ^ string_of_int i
@@ -39,6 +41,7 @@ let to_string = function
 | DerefUpvalue i -> "deref_upvalue " ^ string_of_int i
 | Jump i -> "jump " ^ string_of_int i
 | JumpIfFalse i -> "jump_if_false " ^ string_of_int i
+| SetDefault i -> "set_default " ^ string_of_int i
 | GetField i -> "get_field " ^ string_of_int i
 | SetField i -> "set_field " ^ string_of_int i
 | AddMethod i -> "add_method " ^ string_of_int i
@@ -49,3 +52,4 @@ let to_string = function
 | ImportFor i -> "import_for " ^ string_of_int i
 | TailCall i -> "tail_call " ^ string_of_int i
 | Throw -> "throw"
+| GetType -> "get_type"

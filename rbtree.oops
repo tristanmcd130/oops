@@ -67,4 +67,4 @@ def empty()
 	E()
 end
 
-print(Range(1, 1000).fold(fun(x, y) x.insert(y) end, RBTree.empty()))
+print(Range(1, 1000).fold(fun(x, y) x.insert(y) end, empty()))

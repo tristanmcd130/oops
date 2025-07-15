@@ -23,6 +23,7 @@ and closure = {
 and type' = {
   name: string;
   fields: (string, int) Hashtbl.t;
+  default_values: value option array;
   methods: (string, value) Hashtbl.t;
   mutable traits: trait list;
 }

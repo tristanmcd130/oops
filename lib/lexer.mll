@@ -65,6 +65,7 @@ rule read = parse
 | "match"	{MATCH}
 | "case"	{CASE}
 | id		{ID (lexbuf |> lexeme)}
+| '#'		{skip_comment lexbuf}
 | _			{failwith ("Unexpected character " ^ lexeme lexbuf)}
 | eof		{EOF}
 and read_string buf = parse
@@ -76,3 +77,7 @@ and read_string buf = parse
 | [^ '"' '\\']+	{lexeme lexbuf |> Buffer.add_string buf; read_string buf lexbuf}
 | _				{failwith ("Illegal string character " ^ lexeme lexbuf)}
 | eof			{failwith "Unterminated string"}
+and skip_comment = parse
+| '\n'	{new_line lexbuf; read lexbuf}
+| eof	{EOF}
+| _		{skip_comment lexbuf}

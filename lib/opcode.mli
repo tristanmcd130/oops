@@ -13,6 +13,7 @@ type t =
 | DerefUpvalue of int
 | Jump of int
 | JumpIfFalse of int
+| SetDefault of int
 | GetField of int
 | SetField of int
 | AddMethod of int
@@ -23,5 +24,6 @@ type t =
 | ImportFor of int
 | TailCall of int
 | Throw
+| GetType
 
 val to_string: t -> string

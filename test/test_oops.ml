@@ -92,16 +92,19 @@ let tests = "tests" >::: [
   "let" >:: make_test "let x = 3, y = 0 in x + y end" (Number 3.0);
   "let out of scope" >:: make_error_test "let x = 3 in x end x" (Failure "Undefined global variable x");
   "struct" >:: make_test "struct A a b end" (List []);
-  "struct with bad args" >:: make_error_test "struct A a b end A(56)" (Failure "Constructor for <type A> expected 2 arguments, but received 1");
-  "dot" >:: make_test "struct A a b end A(5, 6).b" (Number 6.0);
-  "dot nonexistent field" >:: make_error_test "struct A a b end A(5, 6).c" (Failure "<type A> has no field/method c");
-  "dot assign" >:: make_test ~module_vars: [("A", Type {name = "A"; fields = [("a", 0); ("b", 1)] |> List.to_seq |> Hashtbl.of_seq; methods = Hashtbl.create 0; traits = []})] "a = A(5, 6) a.b = 8.5 [a.a, a.b]" (List [Number 5.0; Number 8.5]);
-  "dot assign nonexistent field" >:: make_error_test ~module_vars: [("A", Type {name = "A"; fields = [("a", 0); ("b", 1)] |> List.to_seq |> Hashtbl.of_seq; methods = Hashtbl.create 0; traits = []})] "a = A(5, 6) a.c = 8.5" (Failure "<type A> has no field c");
-  "impl for" >:: make_test "struct A a b end impl for A def f() self.a + self.b end end A(5, 6).f()" (Number 11.0);
-  "bound primitive" >:: make_test ~module_vars: [("A", Type {name = "A"; fields = [("a", 0); ("b", 1)] |> List.to_seq |> Hashtbl.of_seq; methods = [("f", Types.Primitive (fun [self; Number x] ->
+  "struct with not enough args" >:: make_error_test "struct A a b end A{a: 56}" (Failure "No default value for field b on <type A>");
+  "struct with invalid args" >:: make_error_test "struct A a b end A{c: 56}" (Failure "<type A> has no field(s) c");
+  "struct with default args" >:: make_test "struct A a = 5 b = 2 end A{}.a" (Number 5.0);
+  "struct overriding default args" >:: make_test "struct A a = 5 b = 2 end A{b: 6}.b" (Number 6.0);
+  "dot" >:: make_test "struct A a b end A{a: 5, b: 6}.b" (Number 6.0);
+  "dot nonexistent field" >:: make_error_test "struct A a b end A{a: 5, b: 6}.c" (Failure "<type A> has no field/method c");
+  "dot assign" >:: make_test ~module_vars: [("A", Type {name = "A"; fields = [("a", 0); ("b", 1)] |> List.to_seq |> Hashtbl.of_seq; default_values = [||]; methods = Hashtbl.create 0; traits = []})] "a = A{a: 5, b: 6} a.b = 8.5 [a.a, a.b]" (List [Number 5.0; Number 8.5]);
+  "dot assign nonexistent field" >:: make_error_test ~module_vars: [("A", Type {name = "A"; fields = [("a", 0); ("b", 1)] |> List.to_seq |> Hashtbl.of_seq; default_values = [||]; methods = Hashtbl.create 0; traits = []})] "a = A{a: 5, b: 6} a.c = 8.5" (Failure "<type A> has no field c");
+  "impl for" >:: make_test "struct A a b end impl for A def f() self.a + self.b end end A{a: 5, b: 6}.f()" (Number 11.0);
+  "bound primitive" >:: make_test ~module_vars: [("A", Type {name = "A"; fields = [("a", 0); ("b", 1)] |> List.to_seq |> Hashtbl.of_seq; default_values = [||]; methods = [("f", Types.Primitive (fun [self; Number x] ->
     let Number a = Value.get_field self "a" in
     let Number b = Value.get_field self "b" in
-    Number (a +. b +. x)))] |> List.to_seq |> Hashtbl.of_seq; traits = []})] "f = A(2, 4).f f(7)" (Number 13.0);
+    Number (a +. b +. x)))] |> List.to_seq |> Hashtbl.of_seq; traits = []})] "f = A{a: 2, b: 4}.f f(7)" (Number 13.0);
   "impl" >:: make_test
     "trait T
       f
@@ -122,7 +125,7 @@ let tests = "tests" >::: [
         self.b
       end
     end
-    A(4, 6).h()" (Number 10.0);
+    A{a: 4, b: 6}.h()" (Number 10.0);
   "partial impl" >:: make_error_test
     "trait T
       f
@@ -172,9 +175,9 @@ let tests = "tests" >::: [
         self.b
       end
     end
-    A(2, 3).h()" (Number 8.0);
+    A{a: 2, b: 3}.h()" (Number 8.0);
   "impl struct" >:: make_error_test "struct A a b end impl A for A end" (Failure "Cannot implement <type A>: it is not a trait");
-  "operator overloading" >:: make_test "struct A a b end impl for A def +(other) A(self.a + other.a, self.b + other.b) end end (A(2, 3) + A(7, 4)).a" (Number 9.0);
+  "operator overloading" >:: make_test "struct A a b end impl for A def +(other) A{a: self.a + other.a, b: self.b + other.b} end end (A{a: 2, b: 3} + A{a: 7, b: 4}).a" (Number 9.0);
   "import" >:: make_test "import \"import_test.oops\" import_test.a" (Number 100.0);
   "import private" >:: make_error_test "import \"import_test.oops\" import_test.b" (Failure "<module from import_test.oops> does not export b");
   "import not global" >:: make_error_test "import \"import_test.oops\" a" (Failure "Undefined global variable a");

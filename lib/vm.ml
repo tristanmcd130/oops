@@ -91,12 +91,19 @@ let step vm =
           (try
             p args |> push vm
           with
-          | e -> failwith "Invalid arguments to primitive function")
+          | _ -> failwith "Invalid arguments to primitive function")
         | Type t ->
-          if List.length args = Hashtbl.length t.fields then
-            Struct (t, args |> Array.of_list) |> push vm
-          else
-            failwith ("Constructor for " ^ Value.to_string (Type t) ^ " expected " ^ string_of_int (Hashtbl.length t.fields) ^ " arguments, but received " ^ string_of_int i)
+          let Map map = List.hd args in
+          (if map |> Hashtbl.to_seq_keys |> Seq.exists (fun (Types.String x) -> x |> Hashtbl.mem t.fields |> not) then
+            failwith (Value.to_string (Type t) ^ " has no field(s) " ^ (map |> Hashtbl.to_seq_keys |> Seq.filter (fun (Types.String x) -> x |> Hashtbl.mem t.fields |> not) |> Seq.map (fun (Types.String x) -> x) |> List.of_seq |> String.concat ", ")));
+          let fields = Array.make (Hashtbl.length t.fields) (Types.List []) in
+          t.fields |> Hashtbl.to_seq |> Seq.iter (fun (n, i) -> Array.set fields i (match Hashtbl.find_opt map (String n) with
+          | None ->
+            (match t.default_values.(i) with
+            | None -> failwith ("No default value for field " ^ n ^ " on " ^ Value.to_string (Type t))
+            | Some v -> v)
+          | Some v -> v));
+          push vm (Struct (t, fields))
         | Method (s, c) -> call_helper (Closure c) (s :: args)
         | x -> failwith ("Cannot call " ^ Value.to_string x) in
       call_helper f !a
@@ -120,6 +127,11 @@ let step vm =
       | Bool false | Number 0.0 | String "" | List [] -> top_frame.ip <- i
       | Map m when Hashtbl.length m = 0 -> top_frame.ip <- i
       | _ -> ())
+    | SetDefault i ->
+      let v = pop vm in
+      let Type t = pop vm in
+      Array.set t.default_values (Hashtbl.find t.fields top_frame.closure.chunk.names.(i)) (Some v);
+      push vm (Type t)
     | GetField i -> Value.get_field (pop vm) top_frame.closure.chunk.names.(i) |> push vm
     | SetField i ->
       let v = pop vm in
@@ -161,14 +173,22 @@ let step vm =
             failwith (Value.to_string (Closure c) ^ " expected " ^ string_of_int c.num_args ^ " arguments, but received " ^ string_of_int i)
         | Primitive p -> p args |> push vm
         | Type t ->
-          if List.length args = Hashtbl.length t.fields then
-            Struct (t, args |> Array.of_list) |> push vm
-          else
-            failwith ("Constructor for " ^ Value.to_string (Type t) ^ " expected " ^ string_of_int (Hashtbl.length t.fields) ^ " arguments, but received " ^ string_of_int i)
+          let Map map = List.hd args in
+          (if map |> Hashtbl.to_seq_keys |> Seq.exists (fun (Types.String x) -> x |> Hashtbl.mem t.fields |> not) then
+            failwith (Value.to_string (Type t) ^ " has no field(s) " ^ (map |> Hashtbl.to_seq_keys |> Seq.filter (fun (Types.String x) -> x |> Hashtbl.mem t.fields |> not) |> Seq.map (fun (Types.String x) -> x) |> List.of_seq |> String.concat ", ")));
+          let fields = Array.make (Hashtbl.length t.fields) (Types.List []) in
+          t.fields |> Hashtbl.to_seq |> Seq.iter (fun (n, i) -> Array.set fields i (match Hashtbl.find_opt map (String n) with
+          | None ->
+            (match t.default_values.(i) with
+            | None -> failwith ("No default value for field " ^ n ^ " on " ^ Value.to_string (Type t))
+            | Some v -> v)
+          | Some v -> v));
+          push vm (Struct (t, fields))
         | Method (s, c) -> tail_call_helper (Closure c) (s :: args)
         | x -> failwith ("Cannot tail call " ^ Value.to_string x) in
       tail_call_helper f !a
-    | Throw -> continue := throw vm (pop vm));
+    | Throw -> continue := throw vm (pop vm)
+    | GetType -> Type (pop vm |> Value.type_of) |> push vm);
     !continue
   else if List.length vm.frames = 1 then
     false

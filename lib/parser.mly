@@ -70,7 +70,7 @@ block:
 stmt:
 	| a = assign									{match a with (n, v) -> Assign (n, v)}
 	| d = def										{match d with (n, ps, b) -> Assign (n, Fun (n, ps, b))}
-	| STRUCT; n = ID; fs = ID*; END					{Assign (n, Struct (n, fs))}
+	| STRUCT; n = ID; fs = field*; END				{Assign (n, Struct (n, fs))}
 	| o = exp; DOT; f = ID; EQUAL; v = exp			{DotAssign (o, f, v)}
 	| IMPL; t = exp?; FOR; ty = exp; ms = def*;	END	{Impl (t, ty, ms)}
 	| TRAIT; n = ID; rs = ID*; ps = def*; END		{Assign (n, Trait (n, rs, ps))}
@@ -84,6 +84,10 @@ stmt:
 assign: n = ID; EQUAL; v = exp	{(n, v)}
 
 def: DEF; n = fun_id; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{(n, ps, b)}
+
+field:
+	| n = ID					{(n, None)}
+	| n = ID; EQUAL; v = exp	{(n, Some v)}
 
 fun_id:
 	| UMINUS	{"u-"}
@@ -123,6 +127,7 @@ exp:
 	| f = exp; LPAREN; a = separated_list(COMMA, exp); RPAREN				{Call (f, a)}
 	| IF; c = exp; THEN; t = block; es = elseif*; e = else_; END			{If ((c, t) :: es @ [e])}
 	| LET; a = separated_list(COMMA, assign); IN; b = block; END			{Call (Fun ("", List.map fst a, b), List.map snd a)}
+	| s = exp; LBRACE; fs = separated_list(COMMA, struct_entry); RBRACE		{Call (s, [Map fs])}
 	| o = exp; DOT; f = ID													{Dot (o, f)}
 	| TRY; t = block; CATCH; n = ID; c = block; END							{Try (t, n, c)}
 	| MATCH; e = exp; cs = case_*; END										{Match (e, cs)}
@@ -155,5 +160,7 @@ elseif: ELSEIF; t = exp; THEN; b = block	{(t, b)}
 else_:
 	|					{(Ast.Bool true, Ast.List [])}
 	| ELSE; e = block	{(Ast.Bool true, e)}
+
+struct_entry: n = ID; COLON; v = exp	{(Ast.String n, v)}
 
 case_: CASE; p = exp; THEN; b = block	{(p, b)}

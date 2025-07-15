@@ -15,6 +15,7 @@ let rec repl line_num =
   Printf.printf "%d> " line_num;
   flush stdout;
   let result = run_from_channel stdin in
+  Module.add module' "_" result;
   Module.add module' (Printf.sprintf "_%d" line_num) result;
   result |> Value.to_string |> print_endline;
   repl (line_num + 1)

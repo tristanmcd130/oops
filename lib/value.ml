@@ -14,7 +14,7 @@ let rec to_string = function
 | Closure {name} -> "<function " ^ name ^ ">"
 | Cell c -> "<cell containing " ^ to_string !c ^ ">"
 | Primitive _ -> "<primitive>"
-| Struct (t, fs) -> t.name ^ "(" ^ (Array.map to_string fs |> Array.to_list |> String.concat ", ") ^ ")"
+| Struct (t, fs) -> t.name ^ "{" ^ (t.fields |> Hashtbl.to_seq |> Seq.map (fun (n, i) -> n ^ ": " ^ to_string fs.(i)) |> List.of_seq |> String.concat ", ") ^ "}"
 | Type t -> "<type " ^ t.name ^ ">"
 | Trait t -> "<trait " ^ t.name ^ ">"
 | Method (_, c) -> to_string (Closure c)
@@ -24,12 +24,12 @@ let base_trait = {name = "Base"; requires = []; provides = [
   ("!=", Primitive (fun [self; other] -> Bool (self <> other)));
   ("to_string", Primitive (fun [self] -> String (to_string self)));
 ] |> List.to_seq |> Hashtbl.of_seq; traits = []}
-let bool_type = {name = "Bool"; fields = Hashtbl.create 0; methods = [
+let bool_type = {name = "Bool"; fields = Hashtbl.create 0; default_values = [||]; methods = [
   ("not", Primitive (fun [Bool self] -> Bool (not self)));
   ("and", Primitive (fun [Bool self; Bool other] -> Bool (self && other)));
   ("or", Primitive (fun [Bool self; Bool other] -> Bool (self || other)));
 ] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
-let number_type = {name = "Number"; fields = Hashtbl.create 0; methods = [
+let number_type = {name = "Number"; fields = Hashtbl.create 0; default_values = [||]; methods = [
   ("u-", Primitive (fun [Number self] -> Number (-.self)));
   ("+", Primitive (fun [Number self; Number other] -> Number (self +. other)));
   ("-", Primitive (fun [Number self; Number other] -> Number (self -. other)));
@@ -41,19 +41,19 @@ let number_type = {name = "Number"; fields = Hashtbl.create 0; methods = [
   (">", Primitive (fun [Number self; Number other] -> Bool (self > other)));
   (">=", Primitive (fun [Number self; Number other] -> Bool (self >= other)));
 ] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
-let string_type = {name = "String"; fields = Hashtbl.create 0; methods = [
+let string_type = {name = "String"; fields = Hashtbl.create 0; default_values = [||]; methods = [
   ("+", Primitive (fun [String self; String other] -> String (self ^ other)));
 ] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
-let list_type = {name = "List"; fields = Hashtbl.create 0; methods = [
+let list_type = {name = "List"; fields = Hashtbl.create 0; default_values = [||]; methods = [
   ("::", Primitive (fun [List self; other] -> List (other :: self)));
   ("head", Primitive (fun [List (h :: _)] -> h));
   ("tail", Primitive (fun [List (_ :: t)] -> List t));
 ] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
-let map_type = {name = "Map"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
-let function_type = {name = "Function"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
-let type_type = {name = "Type"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
-let trait_type = {name = "Trait"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
-let module_type = {name = "Module"; fields = Hashtbl.create 0; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let map_type = {name = "Map"; fields = Hashtbl.create 0; default_values = [||]; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let function_type = {name = "Function"; fields = Hashtbl.create 0; default_values = [||]; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let type_type = {name = "Type"; fields = Hashtbl.create 0; default_values = [||]; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let trait_type = {name = "Trait"; fields = Hashtbl.create 0; default_values = [||]; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let module_type = {name = "Module"; fields = Hashtbl.create 0; default_values = [||]; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
 let rec type_of = function
 | Bool _ -> bool_type
 | Number _ -> number_type

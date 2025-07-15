@@ -4,7 +4,7 @@ trait Stream
 	is_empty
 	def for_each(f)
 		if self.is_empty() then
-			null
+			[]
 		else
 			f(self.head())
 			self.tail().for_each(f)
@@ -53,24 +53,24 @@ impl Stream for List
 end
 
 struct Complex
-	re
-	im
+	re = 0
+	im = 0
 end
 impl for Complex
 	def +(other)
-		Complex(self.re + other.re, self.im + other.im)
+		Complex{re: self.re + other.re, im: self.im + other.im}
 	end
 	def -(other)
-		Complex(self.re - other.re, self.im - other.im)
+		Complex{re: self.re - other.re, im: self.im - other.im}
 	end
 	def *(other)
-		Complex(self.re * other.re - self.im * other.im, self.re * other.im + self.im * other.re)
+		Complex{re: self.re * other.re - self.im * other.im, im: self.re * other.im + self.im * other.re}
 	end
 	def /(other)
-		self * other.conj() * Complex(1 / (other.abs() * other.abs()), 0)
+		self * other.conj() * Complex{re: 1 / (other.abs() * other.abs())}
 	end
 	def conj()
-		Complex(self.re, -self.im)
+		Complex{re: self.re, im: -self.im}
 	end
 	def abs()
 		sqrt(self.re * self.re + self.im * self.im)
@@ -89,7 +89,7 @@ impl Stream for Range
 		self.start
 	end
 	def tail()
-		Range(self.start + 1, self.stop)
+		Range{start: self.start + 1, stop: self.stop}
 	end
 	def is_empty()
 		self.start > self.stop

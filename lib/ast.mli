@@ -10,7 +10,7 @@ type t =
 | Fun of string * string list * t
 | Call of t * t list
 | If of (t * t) list
-| Struct of string * string list
+| Struct of string * (string * t option) list
 | Dot of t * string
 | DotAssign of t * string * t
 | Impl of t option * t * (string * string list * t) list
