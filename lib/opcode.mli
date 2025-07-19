@@ -25,5 +25,6 @@ type t =
 | TailCall of int
 | Throw
 | GetType
+| Dup
 
 val to_string: t -> string

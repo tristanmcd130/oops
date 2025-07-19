@@ -25,6 +25,7 @@ type t =
 | TailCall of int
 | Throw
 | GetType
+| Dup
 
 let to_string = function
 | GetConstant i -> "get_constant " ^ string_of_int i
@@ -53,3 +54,4 @@ let to_string = function
 | TailCall i -> "tail_call " ^ string_of_int i
 | Throw -> "throw"
 | GetType -> "get_type"
+| Dup -> "dup"

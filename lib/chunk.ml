@@ -3,11 +3,16 @@ open Types
 type t = chunk
 
 let empty () = {code = [||]; constants = [||]; names = [||]; handlers = []}
+let rec to_string chunk =
+  "Code:\n" ^ (Array.mapi (fun i x -> string_of_int i ^ ": " ^ Opcode.to_string x) chunk.code |> Array.to_list |> String.concat "\n")
+  ^ "\n\nConstants:\n" ^ (Array.mapi (fun i x -> string_of_int i ^ ": " ^ Value.to_string x) chunk.constants |> Array.to_list |> String.concat "\n")
+  ^ "\n\nNames:\n" ^ (Array.mapi (fun i x -> string_of_int i ^ ": " ^ x) chunk.names |> Array.to_list |> String.concat "\n")
+  ^ "\n\nException handlers:\n" ^ (List.map (fun (f, t) -> string_of_int f ^ "-" ^ string_of_int t ^ ": " ^ string_of_int (t + 1)) chunk.handlers |> String.concat "\n")
 let rec find_first value = function
 | [||] -> None
 | a ->
   try
-    if a.(0) = value then
+    if a.(0) = value || a.(0) == value then
       Some 0
     else
       match Array.length a - 1 |> Array.sub a 1 |> find_first value with
@@ -134,107 +139,66 @@ let rec compile chunk scope module' = function
   add_opcode chunk (Call 1) |> ignore;
   chunk.code.(e) <- Jump (length chunk);
   chunk.handlers <- (s, e) :: chunk.handlers
-| Match (e, cs) -> failwith "not yet"
-  (* compile chunk scope module' e;
+| Match (e, cs) ->
+  compile chunk scope module' e;
   let c = empty () in
-  let s = Scope.make (Some scope) ["!"] in
-  let rec compile_cases cases =
-    let js = ref [] in
-    let e = ref 0 in
-    (match cases with
-    | [] -> compile c s module' (List [])
-    | (p, b) :: cs' ->
-      add_opcode c (GetLocal 0);
-      let rec compile_pattern = function
-      | (Ast.Bool _ | Number _ | String _ | List []) as l ->
-        compile c s module' (Dot (l, "=="));
-        add_opcode c (Call 1);
-        js := add_opcode c (JumpIfFalse 999) :: !js;
-      | List (x :: xs) -> compile_pattern (Call (Dot (List xs, "::"), [x]))
-      | Var "_" -> ()
-      | Var v -> Scope.add_local s v |> ignore
-      | Call (Dot (t, "::"), [h]) ->
-        add_opcode c GetType |> ignore;
-        add_opcode c (GetConstant (add_constant c (Type Value.list_type))) |> ignore;
-        add_opcode c (GetField (add_name c "==")) |> ignore;
-        add_opcode c (Call 1) |> ignore;
-        js := add_opcode c (JumpIfFalse 999) :: !js;
-        compile c s module' (Call (Dot (Var "!", "head"), []));
-        compile_pattern h;
-        compile c s module' (Call (Dot (Var "!", "tail"), []));
-        compile_pattern t
-      | Call (f, a) ->
-        add_opcode c GetType |> ignore;
-        compile c s module' f;
-        add_opcode c (GetField (add_name c "==")) |> ignore;
-        add_opcode c (Call 1) |> ignore;
-        js := add_opcode c (JumpIfFalse 999) :: !js;
-
-      | _ -> failwith "Invalid pattern" in
-      tail_compile c s module' b;
-      e := add_opcode c (Jump 999)) *)
-
-  (* compile chunk scope module' e;
-  let rec compile_case orig = function
-    | [] -> add_opcode chunk (GetConstant (add_constant chunk (String "Pattern match failed"))) |> ignore;
-            add_opcode chunk Throw |> ignore;
-            length chunk
-    | (p, b) :: cs' ->
-      add_opcode chunk (GetConstant (add_constant chunk (Bool true))) |> ignore;
-      (* Create a function to hold the pattern variables *)
-      let c = empty () in
-      let inner_scope = Scope.make (Some scope) [] in
-      let rec bind_pattern p =
-        match p with
-        | Ast.Var "_" -> ()  (* Wildcard pattern matches anything *)
-        | Ast.Var n -> add_opcode c (SetLocal (Scope.add_local inner_scope n)) |> ignore
-        | List [hd; Ast.Var "::"; tl] -> 
-            (* List cons pattern: pop the list, push head and tail *)
-            add_opcode c orig |> ignore; (* Duplicate the value being matched *)
-            add_opcode c (GetField (add_name c "head")) |> ignore;
-            bind_pattern hd;
-            add_opcode c orig |> ignore;
-            add_opcode c (GetField (add_name c "tail")) |> ignore;
-            bind_pattern tl
-        | Call (Var t, fs) ->
-            let struct_type = add_name c t in
-            add_opcode c orig |> ignore;
-            (* Verify it's the right type of struct *)
-            add_opcode c (GetField (add_name c "type")) |> ignore;
-            add_opcode c (GetGlobal struct_type) |> ignore;
-            add_opcode c (GetField (add_name c "==")) |> ignore;
-            add_opcode c (Call 1) |> ignore;
-            add_opcode c orig |> ignore;
-            (* Bind each field *)
-            List.iteri (fun i p -> 
-              match p with
-              | Ast.Var n when n <> "_" ->
-                  add_opcode c (GetField (add_name c (string_of_int i))) |> ignore;
-                  add_opcode c (SetLocal (Scope.add_local inner_scope n)) |> ignore
-              | _ -> ()
-            ) fs
-        | _ -> () in
-      let pattern_match = length chunk - 1 in
-      bind_pattern p;
-      compile c inner_scope module' b;
-      (* Convert to closure and call it immediately *)
-      add_opcode chunk (GetConstant (Closure {
-        name = "";
-        module';
-        chunk = c;
-        num_args = 0;
-        num_locals = Hashtbl.length inner_scope.locals;
-        upvalues = [||]
-      } |> add_constant chunk)) |> ignore;
-      add_opcode chunk (Call 0) |> ignore;
-      let e = length chunk in
-      chunk.code.(pattern_match) <- JumpIfFalse (compile_case orig cs');
-      e in
-  (* Store the value in a temporary global so we can reload it for each pattern *)
-  let glob = add_name chunk "_match_tmp" in
-  add_opcode chunk (SetGlobal glob) |> ignore;
-  let orig = Opcode.GetGlobal glob in
-  compile_case orig cs |> ignore *)
+  let s = Scope.make (Some scope) ["tmp!"] in
+  let rec compile_cases = function
+  | [] ->
+    add_opcode c (GetConstant (add_constant c (String "Match unsuccessful"))) |> ignore;
+    add_opcode c Throw + 1
+  | (p, b) :: cs ->
+    let js = ref [] in (* jumps to next case in current case *)
+    let rec compile_pattern = function
+    | (Ast.Bool _ | Number _ | String _ | List []) as l ->
+      compile c s module' (Dot (l, "=="));
+      add_opcode c (Call 1) |> ignore;
+      js := add_opcode c (JumpIfFalse 999) :: !js
+    | List (h :: t) -> compile_pattern (Call (Dot (List t, "::"), [h]))
+    | Var "_" -> ()
+    | Var v -> add_opcode c (SetLocal (Scope.add_local s v)) |> ignore
+    | Call (Dot (t, "::"), [h]) ->
+      add_opcode c Dup |> ignore;
+      add_opcode c Dup |> ignore;
+      add_opcode c GetType |> ignore;
+      add_opcode c (GetConstant (add_constant c (Type Value.list_type))) |> ignore;
+      add_opcode c (GetField (add_name c "==")) |> ignore;
+      add_opcode c (Call 1) |> ignore;
+      js := add_opcode c (JumpIfFalse 999) :: !js;
+      add_opcode c (GetField (add_name c "head")) |> ignore;
+      add_opcode c (Call 0) |> ignore;
+      compile_pattern h;
+      add_opcode c (GetField (add_name c "tail")) |> ignore;
+      add_opcode c (Call 0) |> ignore;
+      compile_pattern t
+    | Call (t, [Map fs]) ->
+      List.iter (fun (Ast.String k, v) -> add_opcode c Dup |> ignore) fs;
+      add_opcode c GetType |> ignore;
+      compile c s module' (Dot (t, "=="));
+      add_opcode c (Call 1) |> ignore;
+      js := add_opcode c (JumpIfFalse 999) :: !js;
+      List.iter (fun (Ast.String k, v) ->
+        add_opcode c (GetField (add_name c k));
+        compile_pattern v) fs
+    | _ -> failwith "Cannot compile this pattern" in
+    add_opcode c (GetLocal 0) |> ignore;
+    compile_pattern p;
+    compile c s module' b;
+    let je = add_opcode c (Jump 999) in
+    let jd = compile_cases cs in
+    c.code.(je) <- Jump jd;
+    List.iter (fun i -> c.code.(i) <- JumpIfFalse (je + 1)) !js;
+    jd in
+  compile_cases cs |> ignore;
+  s.upvalues |> Hashtbl.iter (fun n (i, l) ->
+    match l with
+    | Scope.Upvalue -> add_opcode chunk (GetUpvalue i) |> ignore
+    | Local -> add_opcode chunk (MakeCell i) |> ignore
+    | _ -> ());
+  add_opcode chunk (GetConstant (Closure {name = ""; module'; chunk = c; num_args = 1; num_locals = Hashtbl.length s.locals - 1; upvalues = [||]} |> add_constant chunk)) |> ignore;
+  if s.upvalues |> Hashtbl.length > 0 then
+    add_opcode chunk (Enclose (s.upvalues |> Hashtbl.length)) |> ignore;
+  add_opcode chunk (Call 1) |> ignore
 and tail_compile chunk scope module' = function
 | Ast.Block [] -> ()
 | Block [x] -> tail_compile chunk scope module' x
@@ -262,8 +226,3 @@ and tail_compile chunk scope module' = function
   compile_if bs |> ignore
 | x -> compile chunk scope module' x
 let to_closure chunk module' = {name = ""; module'; chunk; num_args = 0; num_locals = 0; upvalues = [||]}
-let rec to_string chunk =
-  "Code:\n" ^ (Array.mapi (fun i x -> string_of_int i ^ ": " ^ Opcode.to_string x) chunk.code |> Array.to_list |> String.concat "\n")
-  ^ "\n\nConstants:\n" ^ (Array.mapi (fun i x -> string_of_int i ^ ": " ^ Value.to_string x) chunk.constants |> Array.to_list |> String.concat "\n")
-  ^ "\n\nNames:\n" ^ (Array.mapi (fun i x -> string_of_int i ^ ": " ^ x) chunk.names |> Array.to_list |> String.concat "\n")
-  ^ "\n\nException handlers:\n" ^ (List.map (fun (f, t) -> string_of_int f ^ "-" ^ string_of_int t ^ ": " ^ string_of_int (t + 1)) chunk.handlers |> String.concat "\n")

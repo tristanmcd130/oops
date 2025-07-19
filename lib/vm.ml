@@ -87,7 +87,7 @@ let step vm =
             push_frame vm c args
           else
             failwith (Value.to_string (Closure c) ^ " expected " ^ string_of_int c.num_args ^ " arguments, but received " ^ string_of_int i)
-        | Primitive p -> 
+        | Primitive p ->
           (try
             p args |> push vm
           with
@@ -188,7 +188,11 @@ let step vm =
         | x -> failwith ("Cannot tail call " ^ Value.to_string x) in
       tail_call_helper f !a
     | Throw -> continue := throw vm (pop vm)
-    | GetType -> Type (pop vm |> Value.type_of) |> push vm);
+    | GetType -> Type (pop vm |> Value.type_of) |> push vm
+    | Dup ->
+      let v = pop vm in
+      push vm v;
+      push vm v);
     !continue
   else if List.length vm.frames = 1 then
     false
@@ -197,7 +201,7 @@ let step vm =
     pop_frame vm |> ignore;
     push vm r;
     true)
-let call vm closure args =
+let call vm (closure: Types.closure) args =
   push_frame vm closure args;
   while step vm do () done;
   match vm.frames with

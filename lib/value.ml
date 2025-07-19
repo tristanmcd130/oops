@@ -51,8 +51,12 @@ let list_type = {name = "List"; fields = Hashtbl.create 0; default_values = [||]
 ] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
 let map_type = {name = "Map"; fields = Hashtbl.create 0; default_values = [||]; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
 let function_type = {name = "Function"; fields = Hashtbl.create 0; default_values = [||]; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
-let type_type = {name = "Type"; fields = Hashtbl.create 0; default_values = [||]; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
-let trait_type = {name = "Trait"; fields = Hashtbl.create 0; default_values = [||]; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let type_type = {name = "Type"; fields = Hashtbl.create 0; default_values = [||]; methods = [
+  ("==", Primitive (fun [Type self; Type other] -> Bool (self == other)));
+] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
+let trait_type = {name = "Trait"; fields = Hashtbl.create 0; default_values = [||]; methods = [
+  ("==", Primitive (fun [Trait self; Trait other] -> Bool (self == other)));
+] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
 let module_type = {name = "Module"; fields = Hashtbl.create 0; default_values = [||]; methods = [] |> List.to_seq |> Hashtbl.of_seq; traits = [base_trait]}
 let rec type_of = function
 | Bool _ -> bool_type

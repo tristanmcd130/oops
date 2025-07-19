@@ -201,5 +201,10 @@ let tests = "tests" >::: [
   end" (Number 7.0);
   "try no error" >:: make_test "try 4 catch n n + 2 end" (Number 4.0);
   "match literal" >:: make_test "match 4 case 4 then \"b\" end" (String "b");
+  "match unsuccessful" >:: make_test "match 5 case 4 then \"b\" end" (List []);
+  "match _" >:: make_error_test "match 5 case _ then _ end" (Failure "Undefined global variable _");
+  "match var" >:: make_test "match 5 case t then t + 1 end" (Number 6.0);
+  "match ::" >:: make_test "match [1, 9, 6] case x :: y :: xs then y end" (Number 9.0);
+  "match struct" >:: make_test "struct A a b end match A{a: 5, b: [6, 7, 8]} case false then 1 case A{b: x :: xs, a: 6} then 2 case A{b: x :: xs, a: 5} then 3 case _ then 4 end" (Number 3.0);
 ]
 let _ = run_test_tt_main tests
