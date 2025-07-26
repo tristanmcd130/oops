@@ -3,8 +3,8 @@ export empty
 trait RBTree
 	def member(x)
 		match self
-			case E() then false
-			case T(_, a, y, b) then
+			case E{} then false
+			case T{color: _, left: a, value: y, right: b} then
 				if x < y then
 					a.member(x)
 				elseif x == y then
@@ -17,37 +17,37 @@ trait RBTree
 	def insert(x)
 		def ins(t)
 			match t
-				case E() then T("R", E(), x, E())
-				case T(color, a, y, b) then
+				case E{} then T{color: "R", left: E{}, value: x, right: E{}}
+				case T{color: color, left: a, value: y, right: b} then
 					if x < y then
-						T(color, ins(a), y, b).balance()
+						T{color: color, left: ins(a), value: y, right: b}.balance()
 					elseif x == y then
 						t
 					else
-						T(color, a, y, ins(b)).balance()
+						T{color: color, left: a, value: y, right: ins(b)}.balance()
 					end
 			end
 		end
 		def make_black(t)
 			match t
-				case T(_, a, y, b) then T("B", a, y, b)
+				case T{left: a, value: y, right: b} then T{color: "B", left: a, value: y, right: b}
 			end
 		end
 		make_black(ins(self))
 	end
 	def balance()
 		match self
-			case T("B", T("R", T("R", a, x, b), y, c), z, d)
-				or T("B", T("R", a, x, T("R", b, y, c)), z, d)
-				or T("B", a, x, T("R", T("R", b, y, c), z, d))
-				or T("B", a, x, T("R", b, y, T("R", c, z, d))) then T("R", T("B", a, x, b), y, T("B", c, z, d))
+			case T{color: "B", left: T{color: "R", left: T{color: "R", left: a, value: x, right: b}, value: y, right: c}, value: z, right: d}
+				or T{color: "B", left: T{color: "R", left: a, value: x, right: T{color: "R", left: b, value: y, right: c}}, value: z, right: d}
+				or T{color: "B", left: a, value: x, right: T{color: "R", left: T{color: "R", left: b, value: y, right: c}, value: z, right: d}}
+				or T{color: "B", left: a, value: x, right: T{color: "R", left: b, value: y, right: T{color: "R", left: c, value: z, right: d}}} then T{color: "R", left: T{color: "B", left: a, value: x, right: b}, value: y, right: T{color: "B", left: c, value: z, right: d}}
 			case _ then self
 		end
 	end
 	def to_string()
 		match self
-			case E() then ""
-			case T(color, a, y, b) then "{0}[{1}{0} {2} {3}{0}][0m".format([if color == "R" then "[91m" else "[90m" end, a, y, b])
+			case E{} then ""
+			case T{color: color, left: a, value: y, right: b} then "{0}[{1}{0} {2} {3}{0}][0m".format([if color == "R" then "[91m" else "[90m" end, a, y, b])
 		end
 	end
 end
@@ -64,7 +64,7 @@ end
 impl RBTree for T end
 
 def empty()
-	E()
+	E{}
 end
 
-print(Range(1, 1000).fold(fun(x, y) x.insert(y) end, empty()))
+print(Range{start: 1, stop: 1000}.fold(fun(x, y) x.insert(y) end, empty()))

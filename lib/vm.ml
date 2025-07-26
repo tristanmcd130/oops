@@ -88,10 +88,11 @@ let step vm =
           else
             failwith (Value.to_string (Closure c) ^ " expected " ^ string_of_int c.num_args ^ " arguments, but received " ^ string_of_int i)
         | Primitive p ->
-          (try
+          p args |> push vm
+          (* (try
             p args |> push vm
           with
-          | _ -> failwith "Invalid arguments to primitive function")
+          | _ -> failwith "Invalid arguments to primitive function") *)
         | Type t ->
           let Map map = List.hd args in
           (if map |> Hashtbl.to_seq_keys |> Seq.exists (fun (Types.String x) -> x |> Hashtbl.mem t.fields |> not) then

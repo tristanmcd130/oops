@@ -18,5 +18,5 @@ type t =
 | Import of string * (string option, (string * string) list) Either.t
 | Export of string list
 | Throw of t
-| Try of t * string * t
-| Match of t * (t * t) list
+| Try of t * (t * t) list
+| Match of (t * t) list

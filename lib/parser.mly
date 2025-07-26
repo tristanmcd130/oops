@@ -125,12 +125,12 @@ exp:
 	| e1 = exp; o = binary_op; e2 = exp										{match o with "::" -> Call (Dot (e2, o), [e1]) | _ -> Call (Dot (e1, o), [e2])}
 	| FUN; LPAREN; ps = separated_list(COMMA, ID); RPAREN; b = block; END	{Fun ("", ps, b)}
 	| f = exp; LPAREN; a = separated_list(COMMA, exp); RPAREN				{Call (f, a)}
-	| IF; c = exp; THEN; t = block; es = elseif*; e = else_; END			{If ((c, t) :: es @ [e])}
+	| IF; c = exp; THEN; t = block; es = elseif*; ELSE; e = block; END		{If ((c, t) :: es @ [(Ast.Bool true, e)])}
 	| LET; a = separated_list(COMMA, assign); IN; b = block; END			{Call (Fun ("", List.map fst a, b), List.map snd a)}
 	| s = exp; LBRACE; fs = separated_list(COMMA, struct_entry); RBRACE		{Call (s, [Map fs])}
 	| o = exp; DOT; f = ID													{Dot (o, f)}
-	| TRY; t = block; CATCH; n = ID; c = block; END							{Try (t, n, c)}
-	| MATCH; e = exp; cs = case_*; END										{Match (e, cs)}
+	| TRY; t = block; CATCH; cs = case_*; END								{Try (t, cs)}
+	| MATCH; e = exp; cs = case_*; END										{Ast.Block [e; Match cs]}
 	| LPAREN; e = exp; RPAREN												{e}
 
 map_entry: k = exp; COLON; v = exp	{(k, v)}
@@ -156,10 +156,6 @@ map_entry: k = exp; COLON; v = exp	{(k, v)}
 	| CONS		{"::"}
 
 elseif: ELSEIF; t = exp; THEN; b = block	{(t, b)}
-
-else_:
-	|					{(Ast.Bool true, Ast.List [])}
-	| ELSE; e = block	{(Ast.Bool true, e)}
 
 struct_entry: n = ID; COLON; v = exp	{(Ast.String n, v)}
 

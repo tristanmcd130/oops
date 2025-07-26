@@ -52,7 +52,6 @@ let tests = "tests" >::: [
   "upvalue" >:: make_test "(fun(x) y = 5 fun() x + y end end)(1)()" (Number 6.0);
   "primitive" >:: make_test ~module_vars: [("add_one", Primitive (fun [Number x] -> Number (x +. 1.0)))] "add_one(44)" (Number 45.0);
   "if" >:: make_test "if true then 1 else 2 end" (Number 1.0);
-  "if with no else" >:: make_test "if false then 1 end" (List []);
   "elseif" >:: make_test "if false then 1 elseif true then 2 else 3 end" (Number 2.0);
   "convoluted elseif" >:: make_test
     "if false then
@@ -187,24 +186,27 @@ let tests = "tests" >::: [
   "import as" >:: make_test "import \"import_test.oops\" as m m.a" (Number 100.0);
   "tail call" >:: make_test "def f(x) if x <= 0 then true else f(x - 1) end end f(1e4)" (Bool true);
   "throw" >:: make_test "throw 6" (List []);
-  "try" >:: make_test "try throw 8 catch n n end" (Number 8.0);
-  "empty try" >:: make_test "fun(x, y) x == [] end(try catch n n end, 5)" (Bool true);
+  "try" >:: make_test "try throw 8 catch case n then n end" (Number 8.0);
+  "empty try" >:: make_test "fun(x, y) x == [] end(try catch case n then n end, 5)" (Bool true);
   "try in catch" >:: make_test
   "try
     throw 5
-  catch n
-    try
-      throw n + 1
-    catch m
-      m + 1
-    end
+  catch
+    case n then
+      try
+        throw n + 1
+      catch
+        case m then m + 1
+      end
   end" (Number 7.0);
-  "try no error" >:: make_test "try 4 catch n n + 2 end" (Number 4.0);
+  "try no error" >:: make_test "try 4 catch case n then n + 2 end" (Number 4.0);
   "match literal" >:: make_test "match 4 case 4 then \"b\" end" (String "b");
   "match unsuccessful" >:: make_test "match 5 case 4 then \"b\" end" (List []);
   "match _" >:: make_error_test "match 5 case _ then _ end" (Failure "Undefined global variable _");
   "match var" >:: make_test "match 5 case t then t + 1 end" (Number 6.0);
   "match ::" >:: make_test "match [1, 9, 6] case x :: y :: xs then y end" (Number 9.0);
   "match struct" >:: make_test "struct A a b end match A{a: 5, b: [6, 7, 8]} case false then 1 case A{b: x :: xs, a: 6} then 2 case A{b: x :: xs, a: 5} then 3 case _ then 4 end" (Number 3.0);
+  "match or" >:: make_test "match [1, 2] case 5 or x :: xs then [x, xs] end" (List [Number 1.0; List [Number 2.0]]);
+  "match and" >:: make_test "match [1, 2] case y and x :: xs then [y, xs] end" (List [List [Number 1.0; Number 2.0]; List [Number 2.0]]);
 ]
 let _ = run_test_tt_main tests

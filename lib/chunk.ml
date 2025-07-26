@@ -131,16 +131,14 @@ let rec compile chunk scope module' = function
 | Throw e ->
   compile chunk scope module' e;
   add_opcode chunk Throw |> ignore
-| Try (t, n, c) ->
+| Try (t, cs) ->
   let s = length chunk in
   compile chunk scope module' t;
   let e = add_opcode chunk (Jump 999) in
-  compile chunk scope module' (Fun ("", [n], c));
-  add_opcode chunk (Call 1) |> ignore;
+  compile chunk scope module' (Match cs);
   chunk.code.(e) <- Jump (length chunk);
   chunk.handlers <- (s, e) :: chunk.handlers
-| Match (e, cs) ->
-  compile chunk scope module' e;
+| Match cs ->
   let c = empty () in
   let s = Scope.make (Some scope) ["tmp!"] in
   let rec compile_cases = function
@@ -171,6 +169,16 @@ let rec compile chunk scope module' = function
       add_opcode c (GetField (add_name c "tail")) |> ignore;
       add_opcode c (Call 0) |> ignore;
       compile_pattern t
+    | Call (Dot (p1, "and"), [p2]) ->
+      add_opcode c Dup |> ignore;
+      compile_pattern p1;
+      compile_pattern p2
+    | Call (Dot (p1, "or"), [p2]) ->
+      add_opcode c Dup |> ignore;
+      compile_pattern p1;
+      let jor = add_opcode c (Jump 999) in
+      List.iter (fun i -> c.code.(i) <- JumpIfFalse (jor + 1)) !js;
+      compile_pattern p2
     | Call (t, [Map fs]) ->
       List.iter (fun (Ast.String k, v) -> add_opcode c Dup |> ignore) fs;
       add_opcode c GetType |> ignore;
