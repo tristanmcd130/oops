@@ -55,4 +55,21 @@ end # when a trait's requirements are satisfied, they provide the implementing t
 # the stream type needs the 3 methods head, tail, and is_empty and provides methods like map, filter, and fold
 
 f.filter(fun(x) x % 2 == 0 end).fold(fun(x, y) x + y end) # an easy solution to Project Euler problem 2 in O(n) time
+
+import "other_file.oops" for x, y, z # equivalent of "import x, y, z from other_file" in Python
+export x, f # you have to explicitly choose what to export (make public)
+
+try
+  throw 8
+catch
+  case n then
+    n
+end # error handling, with multiple cases allowed
+
+match f
+  case Fib{c: 0, n: 1} then
+    print("unchanged")
+  case x then
+    print(x)
+end # pattern matching
 ```
